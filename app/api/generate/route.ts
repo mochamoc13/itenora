@@ -77,7 +77,7 @@ function fmtMinutes(mins: number) {
  * IMPORTANT: no `delete` used (fixes Vercel TypeScript error).
  */
 type StopWithTime = { time?: string; [k: string]: any };
-type StopWithInternalTime = StopWithTime & { _t?: number | null };
+type StopWithInternalTime = StopWithTime & { _t: number | null };
 
 function enforceDayTimeRules(
   stops: StopWithTime[],
@@ -93,10 +93,12 @@ function enforceDayTimeRules(
 
   let filtered = parsed;
 
+  // Remove stops before arrival
   if (minStartM !== null) {
     filtered = filtered.filter((s) => s._t == null || s._t >= minStartM);
   }
 
+  // Remove stops after departure
   if (maxEndM !== null) {
     filtered = filtered.filter((s) => s._t == null || s._t <= maxEndM);
   }
@@ -109,16 +111,21 @@ function enforceDayTimeRules(
   const safeStart = Math.min(start, end - 30);
   const safeEnd = Math.max(end, safeStart + 30);
 
+  // ✅ Single stop
   if (n === 1) {
     const { _t, ...rest } = filtered[0];
     return [{ ...rest, time: fmtMinutes(safeStart) }];
   }
 
+  // ✅ Multiple stops — evenly spread
   const step = Math.max(30, Math.floor((safeEnd - safeStart) / (n - 1)));
 
   return filtered.map((s, i) => {
     const { _t, ...rest } = s;
-    return { ...rest, time: fmtMinutes(safeStart + step * i) };
+    return {
+      ...rest,
+      time: fmtMinutes(safeStart + step * i),
+    };
   });
 }
 
