@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+/** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
 type Pace = "relaxed" | "balanced" | "packed";
 type ChildAges = "none" | "baby" | "toddler" | "kids" | "teens";
@@ -13,14 +14,31 @@ type GenerateRequest = {
   budget: "budget" | "mid" | "premium";
   startDate?: string;
 
-  // ✅ NEW
-  arrivalTime?: string;   // "HH:MM" local time
-  departTime?: string;    // "HH:MM" local time
-  childAges?: ChildAges;  // baby/toddler/kids/teens
+  arrivalTime?: string; // "HH:MM" local time
+  departTime?: string; // "HH:MM" local time
+  childAges?: ChildAges; // baby/toddler/kids/teens
   pace?: Pace;
   interests?: string[];
 };
 
+type ItineraryStop = {
+  time: string;
+  title: string;
+  area?: string;
+  notes?: string;
+  mapQuery: string;
+  costEstimate: number;
+};
+
+type ItineraryDay = {
+  day: number;
+  date?: string;
+  theme: string;
+  stops: ItineraryStop[];
+  dailyCostEstimate: number;
+};
+
+/** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -50,31 +68,37 @@ function fmtMinutes(mins: number) {
   return `${hh}:${mm}`;
 }
 
-// ensure times are non-decreasing and within constraints
+/**
+ * Enforce time constraints:
+ * - Day 1 start >= arrivalTime (if provided)
+ * - Last day end <= departTime (if provided)
+ * - If times are missing/invalid, we re-time stops to fit nicely in window
+ *
+ * IMPORTANT: no `delete` used (fixes Vercel TypeScript error).
+ */
 type StopWithTime = { time?: string; [k: string]: any };
+type StopWithInternalTime = StopWithTime & { _t?: number | null };
 
 function enforceDayTimeRules(
   stops: StopWithTime[],
   opts: { minStart?: string | null; maxEnd?: string | null }
-) {
+): StopWithTime[] {
   const minStartM = toMinutes(opts.minStart ?? undefined);
   const maxEndM = toMinutes(opts.maxEnd ?? undefined);
 
-  // add _t as an internal field (no delete needed later)
-  const parsed = stops.map((s) => ({
+  const parsed: StopWithInternalTime[] = stops.map((s) => ({
     ...s,
     _t: toMinutes(s.time),
   }));
 
-  // 1) Drop anything before arrival
   let filtered = parsed;
+
   if (minStartM !== null) {
-    filtered = filtered.filter((s) => s._t === null || s._t >= minStartM);
+    filtered = filtered.filter((s) => s._t == null || s._t >= minStartM);
   }
 
-  // 2) Drop anything after departure
   if (maxEndM !== null) {
-    filtered = filtered.filter((s) => s._t === null || s._t <= maxEndM);
+    filtered = filtered.filter((s) => s._t == null || s._t <= maxEndM);
   }
 
   const n = filtered.length;
@@ -85,21 +109,20 @@ function enforceDayTimeRules(
   const safeStart = Math.min(start, end - 30);
   const safeEnd = Math.max(end, safeStart + 30);
 
-  // If only 1 stop, put it at start
   if (n === 1) {
-    filtered[0].time = fmtMinutes(safeStart);
     const { _t, ...rest } = filtered[0];
-    return [rest];
+    return [{ ...rest, time: fmtMinutes(safeStart) }];
   }
 
   const step = Math.max(30, Math.floor((safeEnd - safeStart) / (n - 1)));
 
   return filtered.map((s, i) => {
-    const t = fmtMinutes(safeStart + step * i);
     const { _t, ...rest } = s;
-    return { ...rest, time: t };
+    return { ...rest, time: fmtMinutes(safeStart + step * i) };
   });
 }
+
+/** ---------- Optional logging ---------- */
 async function logToGoogleSheets(payload: any) {
   const url = process.env.GSHEETS_WEBAPP_URL;
   if (!url) return;
@@ -110,9 +133,12 @@ async function logToGoogleSheets(payload: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch {}
+  } catch {
+    // ignore
+  }
 }
 
+/** ---------- OpenAI ---------- */
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -147,40 +173,35 @@ Rules:
 - dailyCostEstimate must equal sum(costEstimate).
 `;
 
+/** ---------- Route ---------- */
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as GenerateRequest;
+    const body = (await req.json()) as Partial<GenerateRequest>;
 
-    if (!body.destination) {
-      return NextResponse.json(
-        { error: "Destination required" },
-        { status: 400 }
-      );
+    if (!body.destination || !String(body.destination).trim()) {
+      return NextResponse.json({ error: "Destination required" }, { status: 400 });
     }
 
- const safe: GenerateRequest = {
-  destination: body.destination.trim(),
-  days: clamp(Number(body.days ?? 3), 1, 14),
-  people: (body.people ?? "solo") as PeopleType,
-  budget: (body.budget ?? "mid") as GenerateRequest["budget"],
-  startDate: body.startDate,
+    const safe: GenerateRequest = {
+      destination: String(body.destination).trim(),
+      days: clamp(Number(body.days ?? 3), 1, 14),
+      people: (body.people ?? "solo") as PeopleType,
+      budget: (body.budget ?? "mid") as GenerateRequest["budget"],
+      startDate: body.startDate ? String(body.startDate) : undefined,
 
-  // ✅ NEW
-  arrivalTime: body.arrivalTime,
-  departTime: body.departTime,
-  childAges: (body.childAges ?? "none") as any,
+      arrivalTime: body.arrivalTime ? String(body.arrivalTime) : undefined,
+      departTime: body.departTime ? String(body.departTime) : undefined,
+      childAges: (body.childAges ?? "none") as ChildAges,
 
-  pace: body.pace ?? "balanced",
-  interests: Array.isArray(body.interests) ? body.interests : [],
-};
+      pace: (body.pace ?? "balanced") as Pace,
+      interests: Array.isArray(body.interests) ? body.interests : [],
+    };
 
     const dates = safe.startDate
-      ? Array.from({ length: safe.days }).map((_, i) =>
-          addDays(safe.startDate!, i)
-        )
+      ? Array.from({ length: safe.days }).map((_, i) => addDays(safe.startDate!, i))
       : [];
 
-const userPrompt = `
+    const userPrompt = `
 Create a ${safe.days}-day itinerary.
 
 Destination: ${safe.destination}
@@ -197,21 +218,20 @@ Kids age group: ${safe.childAges ?? "none"}
 Constraints:
 - Return JSON ONLY matching the schema exactly. No extra keys.
 - Provide 4–6 stops depending on pace (relaxed=4, balanced=5, packed=6).
-- If arrivalTime is provided, Day 1 must start AFTER that time (no 09:00 start if arriving at 15:00).
-- If departTime is provided, last day must end BEFORE that time (no late activities).
+- If arrivalTime is provided, Day 1 must start AFTER that time.
+- If departTime is provided, last day must end BEFORE that time.
 - If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
 - Include at least 1 kid-appropriate stop per day when kids age group != none.
 - Make it map-friendly: cluster areas each day to reduce backtracking.
-`;
+`.trim();
 
-    // ✅ GPT-5 mini (current model)
-const completion = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [
-    { role: "system", content: SCHEMA_PROMPT },
-    { role: "user", content: userPrompt },
-  ],
-});
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [
+        { role: "system", content: SCHEMA_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+    });
 
     const text = completion.choices[0]?.message?.content ?? "";
 
@@ -219,61 +239,42 @@ const completion = await openai.chat.completions.create({
     try {
       parsed = JSON.parse(text);
     } catch {
-      return NextResponse.json(
-        { error: "AI returned non-JSON", raw: text },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "AI returned non-JSON", raw: text }, { status: 502 });
     }
 
-    const itinerary: ItineraryDay[] = (parsed.itinerary ?? []).slice(0, safe.days).map((d, idx) => {
-  const rawStops = Array.isArray(d.stops) ? d.stops : [];
+    const itinerary: ItineraryDay[] = (parsed.itinerary ?? [])
+      .slice(0, safe.days)
+      .map((d: any, idx: number) => {
+        const rawStops = Array.isArray(d.stops) ? d.stops : [];
 
-  type ItineraryStop = {
-  time: string;
-  title: string;
-  area?: string;
-  notes?: string;
-  mapQuery: string;
-  costEstimate: number;
-};
+        const isDay1 = idx === 0;
+        const isLastDay = idx === safe.days - 1;
 
-type ItineraryDay = {
-  day: number;
-  date?: string;
-  theme: string;
-  stops: ItineraryStop[];
-  dailyCostEstimate: number;
-};
+        const fixedStops = enforceDayTimeRules(rawStops, {
+          minStart: isDay1 ? safe.arrivalTime ?? null : null,
+          maxEnd: isLastDay ? safe.departTime ?? null : null,
+        });
 
-  // ✅ Enforce time rules:
-  const isDay1 = idx === 0;
-  const isLastDay = idx === safe.days - 1;
+        const dailyCostEstimate =
+          typeof d.dailyCostEstimate === "number"
+            ? d.dailyCostEstimate
+            : fixedStops.reduce((sum, s: any) => sum + (Number(s.costEstimate) || 0), 0);
 
-  const fixedStops = enforceDayTimeRules(rawStops, {
-    minStart: isDay1 ? safe.arrivalTime ?? null : null,
-    maxEnd: isLastDay ? safe.departTime ?? null : null,
-  });
-
-  const dailyCostEstimate =
-    typeof d.dailyCostEstimate === "number"
-      ? d.dailyCostEstimate
-      : fixedStops.reduce((sum, s) => sum + (Number(s.costEstimate) || 0), 0);
-
-  return {
-    day: idx + 1,
-    date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
-    theme: d.theme || `Day ${idx + 1}`,
-    stops: fixedStops.map((s: any) => ({
-      time: s.time || "09:00",
-      title: s.title || "Stop",
-      area: s.area ?? undefined,
-      notes: s.notes ?? undefined,
-      mapQuery: s.mapQuery || `${s.title || "Attraction"}, ${safe.destination}`,
-      costEstimate: Number(s.costEstimate) || 0,
-    })),
-    dailyCostEstimate,
-  };
-});
+        return {
+          day: idx + 1,
+          date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
+          theme: d.theme || `Day ${idx + 1}`,
+          stops: fixedStops.map((s: any) => ({
+            time: s.time || "09:00",
+            title: s.title || "Stop",
+            area: s.area ?? undefined,
+            notes: s.notes ?? undefined,
+            mapQuery: s.mapQuery || `${s.title || "Attraction"}, ${safe.destination}`,
+            costEstimate: Number(s.costEstimate) || 0,
+          })),
+          dailyCostEstimate,
+        };
+      });
 
     const responseBody = {
       input: safe,
@@ -285,7 +286,7 @@ type ItineraryDay = {
       },
     };
 
-    // 🔹 async logging (non-blocking)
+    // non-blocking logging (optional)
     logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
@@ -294,15 +295,15 @@ type ItineraryDay = {
       budget: safe.budget,
       pace: safe.pace,
       startDate: safe.startDate ?? "",
+      arrivalTime: safe.arrivalTime ?? "",
+      departTime: safe.departTime ?? "",
+      childAges: safe.childAges ?? "none",
       interests: safe.interests ?? [],
       source: "generate_api_openai",
     });
 
     return NextResponse.json(responseBody);
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message || "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message || "Server error" }, { status: 500 });
   }
 }
