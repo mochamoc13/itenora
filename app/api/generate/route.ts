@@ -51,32 +51,32 @@ function fmtMinutes(mins: number) {
 }
 
 // ensure times are non-decreasing and within constraints
+type StopWithTime = { time?: string; [k: string]: any };
+
 function enforceDayTimeRules(
-  stops: Array<{ time?: string; [k: string]: any }>,
+  stops: StopWithTime[],
   opts: { minStart?: string | null; maxEnd?: string | null }
 ) {
   const minStartM = toMinutes(opts.minStart ?? undefined);
   const maxEndM = toMinutes(opts.maxEnd ?? undefined);
 
-  // Parse stop times; if missing/bad, set to null and we’ll fix later
+  // add _t as an internal field (no delete needed later)
   const parsed = stops.map((s) => ({
     ...s,
     _t: toMinutes(s.time),
   }));
 
-  // 1) Drop anything before arrival (minStart) if provided
+  // 1) Drop anything before arrival
   let filtered = parsed;
   if (minStartM !== null) {
     filtered = filtered.filter((s) => s._t === null || s._t >= minStartM);
   }
 
-  // 2) Drop anything after departure (maxEnd) if provided
+  // 2) Drop anything after departure
   if (maxEndM !== null) {
     filtered = filtered.filter((s) => s._t === null || s._t <= maxEndM);
   }
 
-  // 3) Re-time remaining stops so they fit nicely in the window
-  // If we have a window, spread times evenly.
   const n = filtered.length;
   if (n === 0) return [];
 
@@ -85,21 +85,21 @@ function enforceDayTimeRules(
   const safeStart = Math.min(start, end - 30);
   const safeEnd = Math.max(end, safeStart + 30);
 
-  // If only 1 stop, put it at start.
+  // If only 1 stop, put it at start
   if (n === 1) {
     filtered[0].time = fmtMinutes(safeStart);
-    delete filtered[0]._t;
-    return filtered;
+    const { _t, ...rest } = filtered[0];
+    return [rest];
   }
 
   const step = Math.max(30, Math.floor((safeEnd - safeStart) / (n - 1)));
-  for (let i = 0; i < n; i++) {
-    filtered[i].time = fmtMinutes(safeStart + step * i);
-    delete filtered[i]._t;
-  }
-  return filtered;
-}
 
+  return filtered.map((s, i) => {
+    const t = fmtMinutes(safeStart + step * i);
+    const { _t, ...rest } = s;
+    return { ...rest, time: t };
+  });
+}
 async function logToGoogleSheets(payload: any) {
   const url = process.env.GSHEETS_WEBAPP_URL;
   if (!url) return;
@@ -227,6 +227,23 @@ const completion = await openai.chat.completions.create({
 
     const itinerary: ItineraryDay[] = (parsed.itinerary ?? []).slice(0, safe.days).map((d, idx) => {
   const rawStops = Array.isArray(d.stops) ? d.stops : [];
+
+  type ItineraryStop = {
+  time: string;
+  title: string;
+  area?: string;
+  notes?: string;
+  mapQuery: string;
+  costEstimate: number;
+};
+
+type ItineraryDay = {
+  day: number;
+  date?: string;
+  theme: string;
+  stops: ItineraryStop[];
+  dailyCostEstimate: number;
+};
 
   // ✅ Enforce time rules:
   const isDay1 = idx === 0;
