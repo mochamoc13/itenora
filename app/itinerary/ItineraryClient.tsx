@@ -130,30 +130,42 @@ export default function ItineraryClient() {
   }
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
-  const handleSaveTrip = async () => {
-    if (!data) return;
+  const handleSaveTrip = () => {
+  if (!data) return;
 
-    // 1) Download JSON file (real "save")
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `itenora-${(data.input?.destination || "trip").toString().toLowerCase()}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  const id =
+    (globalThis.crypto?.randomUUID?.() as string | undefined) ||
+    `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-    // 2) Optional: also copy to clipboard (may fail on some browsers)
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    } catch {
-      // ignore clipboard failures; download already succeeded
-    }
+  const destination = (data.input?.destination ?? "Trip").toString();
+  const startDate = (data.input?.startDate ?? "").toString();
 
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const record = {
+    id,
+    title: `${destination}${startDate ? ` • ${startDate}` : ""}`,
+    destination,
+    startDate: startDate || null,
+    createdAt: new Date().toISOString(),
+    data, // full itinerary response
   };
+
+  // load existing list
+  const key = "itenora:savedTrips";
+  const existingRaw = localStorage.getItem(key);
+  const existing = existingRaw ? JSON.parse(existingRaw) : [];
+
+  // prepend newest
+  const next = [record, ...existing].slice(0, 50); // keep last 50
+  localStorage.setItem(key, JSON.stringify(next));
+
+  setSaved(true);
+  setTimeout(() => setSaved(false), 1500);
+
+  // go to saved trip page
+  window.location.href = `/trips/${encodeURIComponent(id)}`;
+};
+
+   
   return (
     <div className="mx-auto max-w-5xl p-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
