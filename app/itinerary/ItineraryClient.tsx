@@ -1,29 +1,23 @@
-    "use client";
+"use client";
 
 import React from "react";
 import { useSearchParams } from "next/navigation";
 
+function gmLink(q: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
 export default function ItineraryClient() {
   const sp = useSearchParams();
 
-  const destination = sp.get("destination") ?? "Tokyo";
-  const days = Number(sp.get("days") ?? "3");
-  const people = sp.get("people") ?? "family";
-  const budget = sp.get("budget") ?? "budget";
-  const pace = sp.get("pace") ?? "balanced";
-  const interests = (sp.get("interests") ?? "").split(",").filter(Boolean);
+  // your existing state/fetch logic here...
+  // const [data, setData] = React.useState(...)
+  // const [error, setError] = React.useState(...)
 
-  // TODO: render your existing itinerary UI here
+  // TEMP: avoid empty file compile issues
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold">Itinerary</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        {days}-day trip to {destination} • {people} • {budget} • {pace}
-      </p>
-
-      {interests.length ? (
-        <p className="mt-2 text-sm">Interests: {interests.join(", ")}</p>
-      ) : null}
-    </main>
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="rounded-2xl border p-5">Itinerary page loading…</div>
+    </div>
   );
 }
