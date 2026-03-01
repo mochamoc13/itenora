@@ -114,10 +114,10 @@ function enforceDayTimeRules(
   const safeEnd = Math.max(end, safeStart + 30);
 
   // ✅ Single stop
-  if (n === 1) {
-    const { _t, ...rest } = filtered[0];
-    return [{ ...rest, time: fmtMinutes(safeStart) }];
-  }
+if (n === 1) {
+  const { _t, ...rest } = filtered[0];
+  return [{ ...rest, time: fmtMinutes(safeStart) }];
+}
 
   // ✅ Multiple stops — evenly spread
   const step = Math.max(30, Math.floor((safeEnd - safeStart) / (n - 1)));
