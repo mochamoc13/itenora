@@ -1,8 +1,14 @@
 // app/itinerary/page.tsx
-"use client";
+import { Suspense } from "react";
+import ItineraryClient from "./ItineraryClient";
 
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading itinerary…</div>}>
+      <ItineraryClient />
+    </Suspense>
+  );
+}
 
 type ApiStop = {
   time: string;
