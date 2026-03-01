@@ -38,7 +38,10 @@ type ItineraryDay = {
   dailyCostEstimate: number;
 };
 
+<<<<<<< HEAD
 /** ---------- Helpers ---------- */
+=======
+>>>>>>> dfc7138 (Fix build and time rules)
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -68,6 +71,7 @@ function fmtMinutes(mins: number) {
   return `${hh}:${mm}`;
 }
 
+<<<<<<< HEAD
 /**
  * Enforce time constraints:
  * - Day 1 start >= arrivalTime (if provided)
@@ -78,6 +82,10 @@ function fmtMinutes(mins: number) {
  */
 type StopWithTime = { time?: string; [k: string]: any };
 type StopWithInternalTime = StopWithTime & { _t: number | null };
+=======
+// ensure times are non-decreasing and within constraints
+type StopWithTime = Record<string, unknown> & { time?: string };
+>>>>>>> dfc7138 (Fix build and time rules)
 
 function enforceDayTimeRules(
   stops: StopWithTime[],
@@ -88,7 +96,7 @@ function enforceDayTimeRules(
 
   const parsed: StopWithInternalTime[] = stops.map((s) => ({
     ...s,
-    _t: toMinutes(s.time),
+    _t: toMinutes(typeof s.time === "string" ? s.time : undefined),
   }));
 
   let filtered = parsed;
@@ -129,8 +137,12 @@ function enforceDayTimeRules(
   });
 }
 
+<<<<<<< HEAD
 /** ---------- Optional logging ---------- */
 async function logToGoogleSheets(payload: any) {
+=======
+async function logToGoogleSheets(payload: unknown) {
+>>>>>>> dfc7138 (Fix build and time rules)
   const url = process.env.GSHEETS_WEBAPP_URL;
   if (!url) return;
 
@@ -141,7 +153,11 @@ async function logToGoogleSheets(payload: any) {
       body: JSON.stringify(payload),
     });
   } catch {
+<<<<<<< HEAD
     // ignore
+=======
+    // ignore logging errors
+>>>>>>> dfc7138 (Fix build and time rules)
   }
 }
 
@@ -186,7 +202,14 @@ export async function POST(req: Request) {
     const body = (await req.json()) as Partial<GenerateRequest>;
 
     if (!body.destination || !String(body.destination).trim()) {
+<<<<<<< HEAD
       return NextResponse.json({ error: "Destination required" }, { status: 400 });
+=======
+      return NextResponse.json(
+        { error: "Destination required" },
+        { status: 400 }
+      );
+>>>>>>> dfc7138 (Fix build and time rules)
     }
 
     const safe: GenerateRequest = {
@@ -194,10 +217,17 @@ export async function POST(req: Request) {
       days: clamp(Number(body.days ?? 3), 1, 14),
       people: (body.people ?? "solo") as PeopleType,
       budget: (body.budget ?? "mid") as GenerateRequest["budget"],
+<<<<<<< HEAD
       startDate: body.startDate ? String(body.startDate) : undefined,
 
       arrivalTime: body.arrivalTime ? String(body.arrivalTime) : undefined,
       departTime: body.departTime ? String(body.departTime) : undefined,
+=======
+      startDate: body.startDate,
+
+      arrivalTime: body.arrivalTime,
+      departTime: body.departTime,
+>>>>>>> dfc7138 (Fix build and time rules)
       childAges: (body.childAges ?? "none") as ChildAges,
 
       pace: (body.pace ?? "balanced") as Pace,
@@ -252,7 +282,11 @@ Constraints:
     const itinerary: ItineraryDay[] = (parsed.itinerary ?? [])
       .slice(0, safe.days)
       .map((d: any, idx: number) => {
+<<<<<<< HEAD
         const rawStops = Array.isArray(d.stops) ? d.stops : [];
+=======
+        const rawStops: StopWithTime[] = Array.isArray(d?.stops) ? d.stops : [];
+>>>>>>> dfc7138 (Fix build and time rules)
 
         const isDay1 = idx === 0;
         const isLastDay = idx === safe.days - 1;
@@ -263,14 +297,27 @@ Constraints:
         });
 
         const dailyCostEstimate =
+<<<<<<< HEAD
           typeof d.dailyCostEstimate === "number"
             ? d.dailyCostEstimate
             : fixedStops.reduce((sum, s: any) => sum + (Number(s.costEstimate) || 0), 0);
+=======
+          typeof d?.dailyCostEstimate === "number"
+            ? d.dailyCostEstimate
+            : fixedStops.reduce(
+                (sum: number, s: any) => sum + (Number(s.costEstimate) || 0),
+                0
+              );
+>>>>>>> dfc7138 (Fix build and time rules)
 
         return {
           day: idx + 1,
           date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
+<<<<<<< HEAD
           theme: d.theme || `Day ${idx + 1}`,
+=======
+          theme: d?.theme || `Day ${idx + 1}`,
+>>>>>>> dfc7138 (Fix build and time rules)
           stops: fixedStops.map((s: any) => ({
             time: s.time || "09:00",
             title: s.title || "Stop",
@@ -293,7 +340,11 @@ Constraints:
       },
     };
 
+<<<<<<< HEAD
     // non-blocking logging (optional)
+=======
+    // async logging (non-blocking)
+>>>>>>> dfc7138 (Fix build and time rules)
     logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
