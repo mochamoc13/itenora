@@ -55,9 +55,10 @@ export default function ItineraryClient() {
     };
   }, [sp]);
 
-  const [loading, setLoading] = useState(true);
+   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false); // ✅ add this here
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +130,30 @@ export default function ItineraryClient() {
   }
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
+  const handleSaveTrip = async () => {
+    if (!data) return;
 
+    // 1) Download JSON file (real "save")
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `itenora-${(data.input?.destination || "trip").toString().toLowerCase()}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    // 2) Optional: also copy to clipboard (may fail on some browsers)
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    } catch {
+      // ignore clipboard failures; download already succeeded
+    }
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
   return (
     <div className="mx-auto max-w-5xl p-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -142,12 +166,15 @@ export default function ItineraryClient() {
           </div>
         </div>
 
-        <button
-          className="rounded-xl border px-4 py-2"
-          onClick={() => navigator.clipboard.writeText(JSON.stringify(data, null, 2))}
-        >
-          Copy JSON
-        </button>
+
+
+<button
+  className="rounded-xl border px-4 py-2 hover:bg-neutral-50 transition active:scale-95"
+  onClick={handleSaveTrip}
+>
+  {saved ? "Saved ✓" : "Save trip details"}
+</button>
+
       </div>
 
       <div className="mt-6 space-y-6">
