@@ -1,6 +1,15 @@
 "use client";
 export const dynamic = "force-dynamic";
 
+export default function TripsPage() {
+  return (
+    <div className="mx-auto max-w-5xl p-6">
+      <h1 className="text-2xl font-bold">Your trips</h1>
+      <p className="mt-2 text-neutral-600">Saved trips will appear here.</p>
+    </div>
+  );
+}
+
 import React from "react";
 
 type ApiStop = {

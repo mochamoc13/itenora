@@ -1,6 +1,6 @@
-// app/api/generate/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { auth } from "@clerk/nextjs/server";
 
 /** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
@@ -70,11 +70,8 @@ function fmtMinutes(mins: number) {
 
 /**
  * Enforce time constraints:
- * - Day 1 start >= arrivalTime (if provided)
- * - Last day end <= departTime (if provided)
- * - If times are missing/invalid, we re-time stops to fit nicely in window
- *
- * IMPORTANT: no `delete` used (fixes Vercel TypeScript error).
+ * - Day 1 start >= arrivalTime
+ * - Last day end <= departTime
  */
 type StopWithTime = { time?: string; [k: string]: any };
 type StopWithInternalTime = StopWithTime & {
@@ -95,12 +92,10 @@ function enforceDayTimeRules(
 
   let filtered = parsed;
 
-  // Remove stops before arrival
   if (minStartM !== null) {
     filtered = filtered.filter((s) => s._t == null || s._t >= minStartM);
   }
 
-  // Remove stops after departure
   if (maxEndM !== null) {
     filtered = filtered.filter((s) => s._t == null || s._t <= maxEndM);
   }
@@ -113,13 +108,11 @@ function enforceDayTimeRules(
   const safeStart = Math.min(start, end - 30);
   const safeEnd = Math.max(end, safeStart + 30);
 
-  // ✅ Single stop
-if (n === 1) {
-  const { _t, ...rest } = filtered[0];
-  return [{ ...rest, time: fmtMinutes(safeStart) }];
-}
+  if (n === 1) {
+    const { _t, ...rest } = filtered[0];
+    return [{ ...rest, time: fmtMinutes(safeStart) }];
+  }
 
-  // ✅ Multiple stops — evenly spread
   const step = Math.max(30, Math.floor((safeEnd - safeStart) / (n - 1)));
 
   return filtered.map((s, i) => {
@@ -184,12 +177,17 @@ Rules:
 
 /** ---------- Route ---------- */
 export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as Partial<GenerateRequest>;
+  const { userId } = await auth();
 
-    if (!body.destination || !String(body.destination).trim()) {
-      return NextResponse.json({ error: "Destination required" }, { status: 400 });
-    }
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "Login required" }),
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await req.json();
 
     const safe: GenerateRequest = {
       destination: String(body.destination).trim(),
@@ -248,7 +246,10 @@ Constraints:
     try {
       parsed = JSON.parse(text);
     } catch {
-      return NextResponse.json({ error: "AI returned non-JSON", raw: text }, { status: 502 });
+      return NextResponse.json(
+        { error: "AI returned non-JSON", raw: text },
+        { status: 502 }
+      );
     }
 
     const itinerary: ItineraryDay[] = (parsed.itinerary ?? [])
@@ -295,7 +296,6 @@ Constraints:
       },
     };
 
-    // non-blocking logging (optional)
     logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
@@ -313,6 +313,9 @@ Constraints:
 
     return NextResponse.json(responseBody);
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || "Server error" },
+      { status: 500 }
+    );
   }
 }

@@ -1,7 +1,9 @@
 "use client";
 
+
 import React from "react";
 import { useRouter } from "next/navigation";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
 const PEOPLE_MAP: Record<string, string> = {
   Solo: "solo",
@@ -753,12 +755,21 @@ if (childAges && childAges !== "none") params.set("childAges", childAges);
     </div>
 
     <div className="md:col-span-12">
-      <button
-        type="submit"
-        className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
-      >
-        Generate itinerary →
-      </button>
+<SignedOut>
+  <SignInButton mode="modal" forceRedirectUrl="/generate">
+    <button className="px-6 py-3 bg-black text-white rounded-lg">
+      Generate my itinerary
+    </button>
+  </SignInButton>
+</SignedOut>
+
+<SignedIn>
+  <a href="/generate">
+    <button className="px-6 py-3 bg-black text-white rounded-lg">
+      Generate my itinerary
+    </button>
+  </a>
+</SignedIn>
       <p className="mt-2 text-xs text-gray-500">
         This takes you to /itinerary with your selections.
       </p>
