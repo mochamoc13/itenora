@@ -1,18 +1,8 @@
 "use client";
-export const dynamic = "force-dynamic";
-
-export default function TripsPage() {
-  return (
-    <div className="mx-auto max-w-5xl p-6">
-      <h1 className="text-2xl font-bold">Your trips</h1>
-      <p className="mt-2 text-neutral-600">Saved trips will appear here.</p>
-    </div>
-  );
-}
-
 
 import React from "react";
-// ...
+
+export const dynamic = "force-dynamic";
 
 type SavedTrip = {
   id: string;
@@ -48,6 +38,7 @@ export default function TripsPage() {
             Saved on this device (browser). No account needed.
           </p>
         </div>
+
         <a className="rounded-xl border px-4 py-2 hover:bg-neutral-50" href="/">
           New trip
         </a>
@@ -55,7 +46,8 @@ export default function TripsPage() {
 
       {trips.length === 0 ? (
         <div className="mt-6 rounded-2xl border p-6 text-neutral-600">
-          No saved trips yet. Generate an itinerary, then click <b>Save trip details</b>.
+          No saved trips yet. Generate an itinerary, then click{" "}
+          <b>Save trip details</b>.
         </div>
       ) : (
         <div className="mt-6 grid gap-4">
@@ -76,6 +68,7 @@ export default function TripsPage() {
                   >
                     Open
                   </a>
+
                   <button
                     className="rounded-xl border px-4 py-2 hover:bg-neutral-50"
                     onClick={() => removeTrip(t.id)}
