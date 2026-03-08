@@ -42,7 +42,11 @@ function gmLink(query: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
-export default function TripDetailPage({ params }: { params: { id: string } }) {
+export default function TripDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const [trip, setTrip] = React.useState<SavedTrip | null>(null);
 
   React.useEffect(() => {
@@ -87,8 +91,8 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
             {data.input.days}-day {data.input.destination} ({data.input.budget})
           </h1>
           <div className="mt-1 text-sm text-neutral-600">
-            Pace: {data.input.pace} • People: {data.input.people} • Est. total
-            (per person): ~{total}
+            Pace: {data.input.pace} • People: {data.input.people} • Est. total (per person): ~
+            {total}
           </div>
           <div className="mt-1 text-xs text-neutral-500">
             Saved {new Date(trip.createdAt).toLocaleString()}
@@ -112,9 +116,7 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
               <div className="text-xl font-semibold">
                 Day {day.day} {day.date ? `• ${day.date}` : ""} — {day.theme}
               </div>
-              <div className="text-sm text-neutral-600">
-                Daily est: ~{day.dailyCostEstimate}
-              </div>
+              <div className="text-sm text-neutral-600">Daily est: ~{day.dailyCostEstimate}</div>
             </div>
 
             <div className="mt-4 divide-y">
@@ -123,9 +125,7 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
                   <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                     <div className="font-medium">
                       {s.time} — {s.title}
-                      {s.area ? (
-                        <span className="text-neutral-500"> • {s.area}</span>
-                      ) : null}
+                      {s.area ? <span className="text-neutral-500"> • {s.area}</span> : null}
                     </div>
                     <div className="text-sm text-neutral-600">~{s.costEstimate}</div>
                   </div>
@@ -152,8 +152,7 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="mt-8 rounded-2xl border p-5 text-sm text-neutral-600">
-        MVP note: Saved locally in your browser. For cross-device saving, we’ll add
-        accounts later.
+        MVP note: Saved locally in your browser. For cross-device saving, we’ll add accounts later.
       </div>
     </div>
   );
