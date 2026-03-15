@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { checkUsage } from "@/lib/usage";
 
 /** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
@@ -134,6 +135,39 @@ async function logToGoogleSheets(payload: any) {
   }
 }
 
+async function incrementUsage(userId: string, plan: string) {
+  const supabase = createSupabaseServerClient();
+  const month = new Date().toISOString().slice(0, 7);
+
+  const { data: existing, error: readError } = await supabase
+    .from("user_usage")
+    .select("itineraries")
+    .eq("user_id", userId)
+    .eq("month", month)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("Usage read error:", readError);
+    return;
+  }
+
+  const nextCount = (existing?.itineraries ?? 0) + 1;
+
+  const { error: upsertError } = await supabase.from("user_usage").upsert(
+    {
+      user_id: userId,
+      month,
+      plan,
+      itineraries: nextCount,
+    },
+    { onConflict: "user_id,month" }
+  );
+
+  if (upsertError) {
+    console.error("Usage increment error:", upsertError);
+  }
+}
+
 /** ---------- OpenAI ---------- */
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -173,47 +207,22 @@ export async function POST(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return new Response(JSON.stringify({ error: "Login required" }), {
-      status: 401,
-    });
+    return NextResponse.json({ error: "Login required" }, { status: 401 });
   }
 
   try {
     const supabase = createSupabaseServerClient();
 
-    /* ---------- Monthly plan limit check ---------- */
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    /* ---------- Monthly usage check ---------- */
+    const usage = await checkUsage(userId);
 
-    // For now everyone is free until you add real plan data
-    const plan = "free";
+    if (!usage.allowed) {
+      const limitLabel =
+        usage.limit === Infinity ? "unlimited" : String(usage.limit);
 
-    const PLAN_LIMITS: Record<string, number> = {
-      free: 5,
-      plus: 25,
-      pro: Infinity,
-    };
-
-    const limit = PLAN_LIMITS[plan] ?? 5;
-
-    const { count, error: countError } = await supabase
-      .from("itineraries")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", monthStart.toISOString());
-
-    if (countError) {
-      console.error("Rate limit error:", countError);
-      return NextResponse.json(
-        { error: "Unable to check usage right now." },
-        { status: 500 }
-      );
-    }
-
-    if (limit !== Infinity && (count ?? 0) >= limit) {
       return NextResponse.json(
         {
-          error: `You have reached your monthly limit of ${limit} itineraries on the ${plan} plan.`,
+          error: `You have reached your monthly limit of ${limitLabel} itineraries on the ${usage.plan} plan.`,
         },
         { status: 429 }
       );
@@ -222,7 +231,7 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const safe: GenerateRequest = {
-      destination: String(body.destination).trim(),
+      destination: String(body.destination ?? "").trim(),
       days: clamp(Number(body.days ?? 3), 1, 14),
       people: (body.people ?? "solo") as PeopleType,
       budget: (body.budget ?? "mid") as GenerateRequest["budget"],
@@ -233,6 +242,13 @@ export async function POST(req: Request) {
       pace: (body.pace ?? "balanced") as Pace,
       interests: Array.isArray(body.interests) ? body.interests : [],
     };
+
+    if (!safe.destination) {
+      return NextResponse.json(
+        { error: "Destination is required" },
+        { status: 400 }
+      );
+    }
 
     const dates = safe.startDate
       ? Array.from({ length: safe.days }).map((_, i) =>
@@ -363,6 +379,8 @@ Constraints:
       );
     }
 
+    await incrementUsage(userId, usage.plan);
+
     await logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
@@ -378,14 +396,19 @@ Constraints:
       source: "generate_api_openai",
       savedTripId: savedTrip.id,
       clerkUserId: userId,
-      plan,
-      monthlyCount: count ?? 0,
-      monthlyLimit: limit === Infinity ? "unlimited" : limit,
+      plan: usage.plan,
+      monthlyCount: usage.used + 1,
+      monthlyLimit: usage.limit === Infinity ? "unlimited" : usage.limit,
     });
 
     return NextResponse.json({
       ...responseBody,
       savedTrip,
+      usage: {
+        plan: usage.plan,
+        used: usage.used + 1,
+        limit: usage.limit === Infinity ? "unlimited" : usage.limit,
+      },
     });
   } catch (err: any) {
     return NextResponse.json(
