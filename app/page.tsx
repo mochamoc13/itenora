@@ -1,18 +1,17 @@
 "use client";
 
-
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
-const PEOPLE_MAP: Record<string, string> = {
+const PEOPLE_MAP: Record<string, "solo" | "couple" | "family"> = {
   Solo: "solo",
   Couple: "couple",
   Friends: "couple",
   Family: "family",
 };
 
-const BUDGET_MAP: Record<string, string> = {
+const BUDGET_MAP: Record<string, "budget" | "mid" | "premium"> = {
   Budget: "budget",
   Mid: "mid",
   Comfort: "mid",
@@ -27,63 +26,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-orange-50 text-gray-900">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-black/5 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          {/* Logo */}
-          <a href="#" className="group flex items-center gap-3">
-            <div className="relative h-11 w-11 overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/10 transition-transform duration-200 group-hover:scale-105">
-              <img
-                src="/itenora-logo.svg"
-                alt="Itenora"
-                className="h-full w-full object-cover"
-              />
-            </div>
-
-            <span className="text-base font-semibold tracking-tight text-gray-900">
-              Itenora
-            </span>
-          </a>
-
-          {/* Nav */}
-          <nav className="hidden items-center gap-8 text-sm font-medium text-gray-600 md:flex">
-            <a className="transition-colors hover:text-gray-900" href="#how">
-              How it works
-            </a>
-            <a className="transition-colors hover:text-gray-900" href="#features">
-              Features
-            </a>
-            <a className="transition-colors hover:text-gray-900" href="#pricing">
-              Pricing
-            </a>
-            <a className="transition-colors hover:text-gray-900" href="#contact">
-              Contact
-            </a>
-          </nav>
-
-          {/* Right CTA */}
-          <div className="flex items-center gap-3">
-            <a
-              href="#pricing"
-              className="hidden rounded-xl px-4 py-2 text-sm font-medium text-gray-600 transition hover:text-gray-900 md:inline-flex"
-            >
-              View pricing
-            </a>
-
-            <a
-              href="#planner"
-              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all duration-200 hover:scale-[1.03] hover:shadow-xl"
-            >
-              Generate my itinerary
-            </a>
-          </div>
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
         <div className="grid items-center gap-10 md:grid-cols-2">
-          {/* Left */}
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700">
               <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
@@ -92,7 +37,7 @@ export default function Home() {
               AI trip planning in minutes
             </div>
 
-            <h1 className="mt-5 text-4xl font-extrabold tracking-tight md:text-6xl leading-[1.05]">
+            <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
               Plan your trip{" "}
               <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
                 with AI
@@ -101,18 +46,17 @@ export default function Home() {
             </h1>
 
             <p className="mt-5 max-w-xl text-lg text-gray-700">
-              Pick a destination, dates, budget, and who’s going (solo, couple, or
-              family). Itenora generates a day-by-day plan with smart routes,
-              food picks, and cost-friendly options.
+              Pick a destination, dates, budget, and who’s going. Itenora
+              generates a day-by-day plan with smart routes, food picks, and
+              cost-friendly options.
             </p>
 
-            {/* CTAs */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a
                 href="#planner"
                 className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
               >
-                Get early access
+                Start planning
               </a>
 
               <a
@@ -127,7 +71,6 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Trust cues */}
             <div className="mt-7 grid max-w-xl grid-cols-2 gap-3 text-sm text-gray-700 sm:grid-cols-3">
               <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
                 <div className="font-semibold">Budget-aware</div>
@@ -146,7 +89,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right */}
           <div className="relative">
             <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-br from-purple-200/50 via-pink-200/30 to-orange-200/40 blur-2xl" />
 
@@ -169,16 +111,20 @@ export default function Home() {
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {["Family pace", "Budget-aware", "Map-friendly", "Food picks", "Transport tips"].map(
-                    (t) => (
-                      <span
-                        key={t}
-                        className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700"
-                      >
-                        {t}
-                      </span>
-                    )
-                  )}
+                  {[
+                    "Family pace",
+                    "Budget-aware",
+                    "Map-friendly",
+                    "Food picks",
+                    "Transport tips",
+                  ].map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700"
+                    >
+                      {t}
+                    </span>
+                  ))}
                 </div>
 
                 <div className="mt-5 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600">
@@ -195,44 +141,59 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Planner Form */}
       <section id="planner" className="mx-auto max-w-6xl px-4 pb-6 md:pb-10">
         <PlannerCard />
       </section>
 
-      {/* How it works */}
       <section id="how" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
               <p className="mt-2 max-w-2xl text-gray-700">
-                A simple flow that turns your preferences into a day-by-day plan you can
-                actually follow.
+                A simple flow that turns your preferences into a day-by-day plan
+                you can actually follow.
               </p>
             </div>
             <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">60 seconds</span> to your first itinerary
+              <span className="font-medium text-gray-900">60 seconds</span> to
+              your first itinerary
             </div>
           </div>
 
           <div className="mt-10 grid gap-5 md:grid-cols-3">
             {[
-              { step: "01", title: "Tell us your trip", desc: "Destination, dates, budget, who’s going, and interests." },
-              { step: "02", title: "We generate a plan", desc: "A logical route with smart stops, food picks, and cost-friendly options." },
-              { step: "03", title: "Customise & export", desc: "Tweak your pace, save trips, share with family, and export anytime." },
+              {
+                step: "01",
+                title: "Tell us your trip",
+                desc: "Destination, dates, budget, who’s going, and interests.",
+              },
+              {
+                step: "02",
+                title: "We generate a plan",
+                desc: "A logical route with smart stops, food picks, and cost-friendly options.",
+              },
+              {
+                step: "03",
+                title: "Customise & export",
+                desc: "Tweak your pace, save trips, share with family, and export anytime.",
+              },
             ].map((x) => (
               <div
                 key={x.step}
                 className="group rounded-3xl border border-gray-200 bg-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500">Step {x.step}</span>
+                  <span className="text-xs font-semibold text-gray-500">
+                    Step {x.step}
+                  </span>
                   <span className="h-9 w-9 rounded-2xl bg-gradient-to-br from-purple-100 via-pink-100 to-orange-100 ring-1 ring-black/5" />
                 </div>
 
                 <div className="mt-4 text-lg font-semibold">{x.title}</div>
-                <div className="mt-2 text-sm leading-relaxed text-gray-700">{x.desc}</div>
+                <div className="mt-2 text-sm leading-relaxed text-gray-700">
+                  {x.desc}
+                </div>
 
                 <div className="mt-6 h-px w-full bg-gradient-to-r from-purple-200/60 via-pink-200/40 to-orange-200/60 opacity-0 transition group-hover:opacity-100" />
               </div>
@@ -241,36 +202,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="mx-auto max-w-6xl px-4 py-16">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Features</h2>
             <p className="mt-2 max-w-2xl text-gray-700">
-              Built for real trips — whether you’re solo, with friends, or travelling with the kids.
+              Built for real trips — whether you’re solo, with friends, or
+              travelling with the kids.
             </p>
           </div>
           <div className="text-sm text-gray-600">
-            Designed to be <span className="font-medium text-gray-900">mobile-first</span>
+            Designed to be{" "}
+            <span className="font-medium text-gray-900">mobile-first</span>
           </div>
         </div>
 
         <div className="mt-10 grid gap-5 md:grid-cols-2">
           {[
-            { title: "Budget-aware suggestions", desc: "Options that match your budget — from free spots to paid attractions.", tint: "from-purple-100 via-pink-100 to-orange-100" },
-            { title: "Pace controls", desc: "Relaxed, normal, or packed — itineraries that fit your energy.", tint: "from-orange-100 via-pink-100 to-purple-100" },
-            { title: "Map-friendly stops", desc: "Stops grouped logically to reduce travel time between places.", tint: "from-pink-100 via-purple-100 to-orange-100" },
-            { title: "Family-ready planning", desc: "Kid-friendly ideas and a sensible daily flow, so everyone enjoys the trip.", tint: "from-purple-100 via-orange-100 to-pink-100" },
+            {
+              title: "Budget-aware suggestions",
+              desc: "Options that match your budget — from free spots to paid attractions.",
+              tint: "from-purple-100 via-pink-100 to-orange-100",
+            },
+            {
+              title: "Pace controls",
+              desc: "Relaxed, normal, or packed — itineraries that fit your energy.",
+              tint: "from-orange-100 via-pink-100 to-purple-100",
+            },
+            {
+              title: "Map-friendly stops",
+              desc: "Stops grouped logically to reduce travel time between places.",
+              tint: "from-pink-100 via-purple-100 to-orange-100",
+            },
+            {
+              title: "Family-ready planning",
+              desc: "Kid-friendly ideas and a sensible daily flow, so everyone enjoys the trip.",
+              tint: "from-purple-100 via-orange-100 to-pink-100",
+            },
           ].map((x) => (
             <div
               key={x.title}
               className="group rounded-3xl border border-gray-200 bg-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex items-start gap-4">
-                <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${x.tint} ring-1 ring-black/5`} />
+                <div
+                  className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${x.tint} ring-1 ring-black/5`}
+                />
                 <div>
                   <div className="text-lg font-semibold">{x.title}</div>
-                  <div className="mt-2 text-sm leading-relaxed text-gray-700">{x.desc}</div>
+                  <div className="mt-2 text-sm leading-relaxed text-gray-700">
+                    {x.desc}
+                  </div>
                 </div>
               </div>
 
@@ -280,19 +262,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing */}
       <section id="pricing" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
               <p className="mt-2 max-w-2xl text-gray-700">
-                Start free. Upgrade when you’re planning more trips or want exports and advanced preferences.
+                Start free. Upgrade when you’re planning more trips or want
+                exports and advanced preferences.
               </p>
             </div>
 
             <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">Cancel anytime</span> • No lock-in
+              <span className="font-medium text-gray-900">Cancel anytime</span>{" "}
+              • No lock-in
             </div>
           </div>
 
@@ -301,7 +284,9 @@ export default function Home() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Explorer</div>
-                  <div className="mt-1 text-sm text-gray-600">For trying Itenora</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For trying Itenora
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Free
@@ -314,10 +299,18 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> 2 itineraries / month</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Budget-friendly suggestions</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Save 1 trip</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Email support</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> 2 itineraries / month
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Budget-friendly suggestions
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Save 1 trip
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Email support
+                </li>
               </ul>
 
               <a
@@ -327,7 +320,9 @@ export default function Home() {
                 Start free
               </a>
 
-              <p className="mt-3 text-xs text-gray-500">No credit card required.</p>
+              <p className="mt-3 text-xs text-gray-500">
+                No credit card required.
+              </p>
             </div>
 
             <div className="relative rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
@@ -340,7 +335,9 @@ export default function Home() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Plus</div>
-                  <div className="mt-1 text-sm text-gray-600">For regular travel planning</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For regular travel planning
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Best value
@@ -353,11 +350,21 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> 20 itineraries / month</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Save up to 10 trips</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Export + share</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> No watermark</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Faster generation</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> 20 itineraries / month
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Save up to 10 trips
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Export + share
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> No watermark
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Faster generation
+                </li>
               </ul>
 
               <a
@@ -367,14 +374,18 @@ export default function Home() {
                 Upgrade to Plus
               </a>
 
-              <p className="mt-3 text-xs text-gray-500">Great for families planning multiple days.</p>
+              <p className="mt-3 text-xs text-gray-500">
+                Great for families planning multiple days.
+              </p>
             </div>
 
             <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Pro</div>
-                  <div className="mt-1 text-sm text-gray-600">For power users</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For power users
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Unlimited
@@ -387,10 +398,18 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Unlimited itineraries</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Advanced preferences</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Multi-city planning (coming soon)</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Priority support</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Unlimited itineraries
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Advanced preferences
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Multi-city planning (coming soon)
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Priority support
+                </li>
               </ul>
 
               <a
@@ -400,7 +419,9 @@ export default function Home() {
                 Go Pro
               </a>
 
-              <p className="mt-3 text-xs text-gray-500">Best for frequent travellers.</p>
+              <p className="mt-3 text-xs text-gray-500">
+                Best for frequent travellers.
+              </p>
             </div>
           </div>
 
@@ -421,10 +442,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
       <section id="cta" className="mx-auto max-w-6xl px-4 py-16">
         <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm md:p-12">
-          <h2 className="text-2xl font-semibold tracking-tight">Want early access?</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Want early access?
+          </h2>
           <p className="mt-3 text-gray-700">
             Leave your email and we’ll notify you when Itenora is ready.
           </p>
@@ -438,7 +460,8 @@ export default function Home() {
               setCtaMsg("");
 
               const form = e.currentTarget;
-              const emailEl = form.querySelector<HTMLInputElement>('input[type="email"]');
+              const emailEl =
+                form.querySelector<HTMLInputElement>('input[type="email"]');
               const email = (emailEl?.value || "").trim();
 
               try {
@@ -504,18 +527,20 @@ export default function Home() {
             </p>
           ) : null}
 
-          <p className="mt-3 text-xs text-gray-500">No spam. Unsubscribe anytime.</p>
+          <p className="mt-3 text-xs text-gray-500">
+            No spam. Unsubscribe anytime.
+          </p>
         </div>
       </section>
 
-      {/* Footer */}
       <footer id="contact" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-sm font-semibold">Itenora</div>
               <div className="mt-1 text-sm text-gray-700">
-                Questions? Email: <span className="font-medium">hello@itenora.com</span>
+                Questions? Email:{" "}
+                <span className="font-medium">hello@itenora.com</span>
               </div>
             </div>
             <div className="text-xs text-gray-500">
@@ -528,10 +553,9 @@ export default function Home() {
   );
 }
 
-/* ---------- Components below Home() ---------- */
-
 function PlannerCard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const interestOptions = [
     "Food",
@@ -544,21 +568,79 @@ function PlannerCard() {
     "Night markets",
   ] as const;
 
-  const [destination, setDestination] = React.useState("Tokyo");
-  const [people, setPeople] = React.useState<"Solo" | "Couple" | "Friends" | "Family">("Family");
-  const [days, setDays] = React.useState<number>(3);
-  const [budget, setBudget] = React.useState<"Budget" | "Mid" | "Comfort" | "Luxury">("Budget");
-  const [startDate, setStartDate] = React.useState<string>("");
-  const [selected, setSelected] = React.useState<string[]>(["Food", "Anime", "Shopping"]);
-  const [arrivalTime, setArrivalTime] = React.useState<string>("");
-  const [departTime, setDepartTime] = React.useState<string>("");
-  const [childAges, setChildAges] = React.useState<"none" | "baby" | "toddler" | "kids" | "teens">("none");
+  const [destination, setDestination] = React.useState(
+    searchParams.get("destination") || "Tokyo"
+  );
+
+  const [people, setPeople] = React.useState<
+    "Solo" | "Couple" | "Friends" | "Family"
+  >(() => {
+    const p = searchParams.get("people");
+    if (p === "solo") return "Solo";
+    if (p === "couple") return "Couple";
+    if (p === "family") return "Family";
+    return "Family";
+  });
+
+  const [days, setDays] = React.useState<number>(
+    Number(searchParams.get("days") || 3)
+  );
+
+  const [budget, setBudget] = React.useState<
+    "Budget" | "Mid" | "Comfort" | "Luxury"
+  >(() => {
+    const b = searchParams.get("budget");
+    if (b === "budget") return "Budget";
+    if (b === "mid") return "Mid";
+    if (b === "premium") return "Luxury";
+    return "Budget";
+  });
+
+  const [startDate, setStartDate] = React.useState<string>(
+    searchParams.get("startDate") || ""
+  );
+
+  const [selected, setSelected] = React.useState<string[]>(
+    searchParams.get("interests")
+      ? searchParams
+          .get("interests")!
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : ["Food", "Anime", "Shopping"]
+  );
+
+  const [arrivalTime, setArrivalTime] = React.useState<string>(
+    searchParams.get("arrivalTime") || ""
+  );
+
+  const [departTime, setDepartTime] = React.useState<string>(
+    searchParams.get("departTime") || ""
+  );
+
+  const [childAges, setChildAges] = React.useState<
+    "none" | "baby" | "toddler" | "kids" | "teens"
+  >(
+    ((searchParams.get("childAges") as
+      | "none"
+      | "baby"
+      | "toddler"
+      | "kids"
+      | "teens") || "none")
+  );
+
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
 
   const toggleInterest = (t: string) => {
-    setSelected((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+    setSelected((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
   };
 
   const safeDays = Math.min(14, Math.max(1, Number.isFinite(days) ? days : 3));
+  const pace: "relaxed" | "balanced" =
+    people === "Family" ? "relaxed" : "balanced";
 
   const plan = buildMockPlan({
     destination: destination.trim() || "Your destination",
@@ -568,6 +650,49 @@ function PlannerCard() {
     interests: selected,
   });
 
+  async function handleGenerate() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          destination: destination.trim() || "Tokyo",
+          days: safeDays,
+          people: PEOPLE_MAP[people],
+          budget: BUDGET_MAP[budget],
+          pace,
+          startDate: startDate || undefined,
+          arrivalTime: arrivalTime || undefined,
+          departTime: departTime || undefined,
+          childAges,
+          interests: selected.map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate itinerary");
+      }
+
+      if (data.savedTrip?.id) {
+        router.push(`/trips/${data.savedTrip.id}`);
+        return;
+      }
+
+      router.push("/itinerary");
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
       <div className="pointer-events-none absolute -inset-10 -z-10 rounded-[2rem] bg-gradient-to-br from-purple-200/40 via-pink-200/25 to-orange-200/30 blur-2xl" />
@@ -576,213 +701,226 @@ function PlannerCard() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Try the planner</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Interactive MVP preview (no AI yet). When ready, this will generate the real itinerary.
+            Interactive planner with live preview. Generate a real AI itinerary
+            when ready.
           </p>
         </div>
 
         <div className="text-xs text-gray-500">
-          Free to start • <span className="font-medium text-gray-700">Cancel anytime</span>
+          Free to start •{" "}
+          <span className="font-medium text-gray-700">Cancel anytime</span>
         </div>
       </div>
 
       <div className="mt-6 grid gap-6 md:grid-cols-12">
-        {/* Form */}
-<form
-  className="md:col-span-7"
-  onSubmit={(e) => {
-    e.preventDefault();
-
-    const pace = people === "Family" ? "relaxed" : "balanced";
-
-    const params = new URLSearchParams();
-    params.set("destination", destination.trim() || "Tokyo");
-    params.set("days", String(safeDays));
-    params.set("people", PEOPLE_MAP[people]);
-    params.set("budget", BUDGET_MAP[budget]);
-    params.set("pace", pace);
-
-    if (startDate) params.set("startDate", startDate);
-
-    const interestsCsv = selected.map((s) => s.trim()).filter(Boolean).join(",");
-    if (interestsCsv) params.set("interests", interestsCsv);
-
-    if (arrivalTime) params.set("arrivalTime", arrivalTime);
-if (departTime) params.set("departTime", departTime);
-if (childAges && childAges !== "none") params.set("childAges", childAges);
-
-    router.push(`/itinerary?${params.toString()}`);
-  }}
->
-  <div className="grid gap-4 md:grid-cols-12">
-    <div className="md:col-span-6">
-      <label className="text-xs font-semibold text-gray-700">Destination</label>
-      <input
-        value={destination}
-        onChange={(e) => setDestination(e.target.value)}
-        placeholder="Tokyo, Singapore, Bali..."
-        className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-      />
-    </div>
-
-    <div className="md:col-span-3">
-      <label className="text-xs font-semibold text-gray-700">People</label>
-      <select
-        value={people}
-        onChange={(e) => setPeople(e.target.value as any)}
-        className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-      >
-        <option>Solo</option>
-        <option>Couple</option>
-        <option>Friends</option>
-        <option>Family</option>
-      </select>
-    </div>
-
-    <div className="md:col-span-3">
-      <label className="text-xs font-semibold text-gray-700">Days</label>
-      <input
-        type="number"
-        min={1}
-        max={14}
-        value={days}
-        onChange={(e) => setDays(parseInt(e.target.value || "3", 10))}
-        className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-      />
-      <p className="mt-1 text-[11px] text-gray-500">Max 14 days in preview.</p>
-    </div>
-
-    <div className="md:col-span-6">
-      <label className="text-xs font-semibold text-gray-700">Budget style</label>
-      <select
-        value={budget}
-        onChange={(e) => setBudget(e.target.value as any)}
-        className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-      >
-        <option>Budget</option>
-        <option>Mid</option>
-        <option>Comfort</option>
-        <option>Luxury</option>
-      </select>
-    </div>
-
-    <div className="md:col-span-6">
-      <label className="text-xs font-semibold text-gray-700">Start date (optional)</label>
-      <input
-        type="date"
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-        className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-      />
-    </div>
-
-<div className="md:col-span-6">
-  <label className="text-xs font-semibold text-gray-700">Arrival time (optional)</label>
-  <input
-    type="time"
-    value={arrivalTime}
-    onChange={(e) => setArrivalTime(e.target.value)}
-    className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-  />
-  <p className="mt-1 text-[11px] text-gray-500">If set, Day 1 starts after arrival.</p>
-</div>
-
-<div className="md:col-span-6">
-  <label className="text-xs font-semibold text-gray-700">Departure time (optional)</label>
-  <input
-    type="time"
-    value={departTime}
-    onChange={(e) => setDepartTime(e.target.value)}
-    className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-  />
-  <p className="mt-1 text-[11px] text-gray-500">If set, last day ends earlier.</p>
-</div>
-
-<div className="md:col-span-12">
-  <label className="text-xs font-semibold text-gray-700">Kids age group (optional)</label>
-  <select
-    value={childAges}
-    onChange={(e) => setChildAges(e.target.value as any)}
-    className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-  >
-    <option value="none">No kids / not specified</option>
-    <option value="baby">Baby (0–1)</option>
-    <option value="toddler">Toddler (1–3)</option>
-    <option value="kids">Young kids (4–10)</option>
-    <option value="teens">Teens (11–17)</option>
-  </select>
-</div>
-
-    <div className="md:col-span-12">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-gray-700">Interests</label>
-        <button
-          type="button"
-          onClick={() => setSelected(["Food", "Nature"])}
-          className="text-xs font-medium text-gray-600 hover:text-gray-900"
+        <form
+          className="md:col-span-7"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleGenerate();
+          }}
         >
-          Use simple
-        </button>
-      </div>
+          <div className="grid gap-4 md:grid-cols-12">
+            <div className="md:col-span-6">
+              <label className="text-xs font-semibold text-gray-700">
+                Destination
+              </label>
+              <input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Tokyo, Singapore, Bali..."
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              />
+            </div>
 
-      <div className="mt-2 flex flex-wrap gap-2">
-        {interestOptions.map((t) => {
-          const on = selected.includes(t);
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => toggleInterest(t)}
-              className={[
-                "rounded-full px-3 py-2 text-xs font-medium transition border",
-                on
-                  ? "border-transparent bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white shadow-sm"
-                  : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
-              ].join(" ")}
-              aria-pressed={on}
-            >
-              {t}
-            </button>
-          );
-        })}
-      </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-semibold text-gray-700">People</label>
+              <select
+                value={people}
+                onChange={(e) => setPeople(e.target.value as any)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              >
+                <option>Solo</option>
+                <option>Couple</option>
+                <option>Friends</option>
+                <option>Family</option>
+              </select>
+            </div>
 
-      <p className="mt-2 text-xs text-gray-500">
-        Selected:{" "}
-        <span className="font-medium text-gray-700">
-          {selected.length ? selected.join(", ") : "None (we’ll keep it general)"}
-        </span>
-      </p>
-    </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-semibold text-gray-700">Days</label>
+              <input
+                type="number"
+                min={1}
+                max={14}
+                value={days}
+                onChange={(e) => setDays(parseInt(e.target.value || "3", 10))}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">Max 14 days.</p>
+            </div>
 
-    <div className="md:col-span-12">
-<SignedOut>
-  <SignInButton mode="modal" forceRedirectUrl="/generate">
-    <button className="px-6 py-3 bg-black text-white rounded-lg">
-      Generate my itinerary
-    </button>
-  </SignInButton>
-</SignedOut>
+            <div className="md:col-span-6">
+              <label className="text-xs font-semibold text-gray-700">
+                Budget style
+              </label>
+              <select
+                value={budget}
+                onChange={(e) => setBudget(e.target.value as any)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              >
+                <option>Budget</option>
+                <option>Mid</option>
+                <option>Comfort</option>
+                <option>Luxury</option>
+              </select>
+            </div>
 
-<SignedIn>
-  <a href="/generate">
-    <button className="px-6 py-3 bg-black text-white rounded-lg">
-      Generate my itinerary
-    </button>
-  </a>
-</SignedIn>
-      <p className="mt-2 text-xs text-gray-500">
-        This takes you to /itinerary with your selections.
-      </p>
-    </div>
-  </div>
-</form>
+            <div className="md:col-span-6">
+              <label className="text-xs font-semibold text-gray-700">
+                Start date (optional)
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              />
+            </div>
 
-        {/* Preview */}
+            <div className="md:col-span-6">
+              <label className="text-xs font-semibold text-gray-700">
+                Arrival time (optional)
+              </label>
+              <input
+                type="time"
+                value={arrivalTime}
+                onChange={(e) => setArrivalTime(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                If set, Day 1 starts after arrival.
+              </p>
+            </div>
+
+            <div className="md:col-span-6">
+              <label className="text-xs font-semibold text-gray-700">
+                Departure time (optional)
+              </label>
+              <input
+                type="time"
+                value={departTime}
+                onChange={(e) => setDepartTime(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                If set, last day ends earlier.
+              </p>
+            </div>
+
+            <div className="md:col-span-12">
+              <label className="text-xs font-semibold text-gray-700">
+                Kids age group (optional)
+              </label>
+              <select
+                value={childAges}
+                onChange={(e) => setChildAges(e.target.value as any)}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+              >
+                <option value="none">No kids / not specified</option>
+                <option value="baby">Baby (0–1)</option>
+                <option value="toddler">Toddler (1–3)</option>
+                <option value="kids">Young kids (4–10)</option>
+                <option value="teens">Teens (11–17)</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-12">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-gray-700">
+                  Interests
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setSelected(["Food", "Nature"])}
+                  className="text-xs font-medium text-gray-600 hover:text-gray-900"
+                >
+                  Use simple
+                </button>
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {interestOptions.map((t) => {
+                  const on = selected.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => toggleInterest(t)}
+                      className={[
+                        "rounded-full border px-3 py-2 text-xs font-medium transition",
+                        on
+                          ? "border-transparent bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white shadow-sm"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
+                      ].join(" ")}
+                      aria-pressed={on}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="mt-2 text-xs text-gray-500">
+                Selected:{" "}
+                <span className="font-medium text-gray-700">
+                  {selected.length
+                    ? selected.join(", ")
+                    : "None (we’ll keep it general)"}
+                </span>
+              </p>
+            </div>
+
+            <div className="md:col-span-12">
+              <SignedOut>
+                <SignInButton mode="modal" forceRedirectUrl="/#planner">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-black px-6 py-3 text-white"
+                  >
+                    Sign in to generate
+                  </button>
+                </SignInButton>
+              </SignedOut>
+
+              <SignedIn>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-lg bg-black px-6 py-3 text-white disabled:opacity-60"
+                >
+                  {loading ? "Generating..." : "Generate my itinerary"}
+                </button>
+              </SignedIn>
+
+              {error ? (
+                <p className="mt-3 text-sm text-red-600">{error}</p>
+              ) : null}
+
+              <p className="mt-2 text-xs text-gray-500">
+                This will generate and save your itinerary.
+              </p>
+            </div>
+          </div>
+        </form>
+
         <div className="md:col-span-5">
           <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold text-gray-500">Live preview</p>
+                <p className="text-xs font-semibold text-gray-500">
+                  Live preview
+                </p>
                 <h3 className="mt-1 text-lg font-semibold">
                   {safeDays}-day {destination.trim() ? destination.trim() : "Trip"}{" "}
                   <span className="text-sm font-medium text-gray-500">
@@ -791,7 +929,9 @@ if (childAges && childAges !== "none") params.set("childAges", childAges);
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
                   {people} •{" "}
-                  {selected.length ? selected.slice(0, 3).join(" • ") : "General highlights"}
+                  {selected.length
+                    ? selected.slice(0, 3).join(" • ")
+                    : "General highlights"}
                   {selected.length > 3 ? " • ..." : ""}
                   {startDate ? ` • starts ${startDate}` : ""}
                 </p>
@@ -811,14 +951,16 @@ if (childAges && childAges !== "none") params.set("childAges", childAges);
                   </div>
                   <div className="mt-1 text-gray-700">{d.summary}</div>
                   <div className="mt-2 text-xs text-gray-500">
-                    Est. spend: <span className="font-medium text-gray-700">{d.spend}</span>
+                    Est. spend:{" "}
+                    <span className="font-medium text-gray-700">{d.spend}</span>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-3 text-xs text-gray-600">
-              Includes: transport tips • cost hints • family pacing • map-friendly stops
+              Includes: transport tips • cost hints • family pacing •
+              map-friendly stops
             </div>
           </div>
         </div>
@@ -850,7 +992,11 @@ function buildMockPlan({
       : "top experiences";
 
   const pace =
-    people === "Family" ? "family pace" : budget === "Luxury" ? "comfortable" : "balanced";
+    people === "Family"
+      ? "family pace"
+      : budget === "Luxury"
+      ? "comfortable"
+      : "balanced";
 
   const spend = (() => {
     if (budget === "Budget") return "Low";

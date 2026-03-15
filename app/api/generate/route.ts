@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
@@ -13,10 +14,9 @@ type GenerateRequest = {
   people: PeopleType;
   budget: "budget" | "mid" | "premium";
   startDate?: string;
-
-  arrivalTime?: string; // "HH:MM" local time
-  departTime?: string; // "HH:MM" local time
-  childAges?: ChildAges; // baby/toddler/kids/teens
+  arrivalTime?: string;
+  departTime?: string;
+  childAges?: ChildAges;
   pace?: Pace;
   interests?: string[];
 };
@@ -68,11 +68,6 @@ function fmtMinutes(mins: number) {
   return `${hh}:${mm}`;
 }
 
-/**
- * Enforce time constraints:
- * - Day 1 start >= arrivalTime
- * - Last day end <= departTime
- */
 type StopWithTime = { time?: string; [k: string]: any };
 type StopWithInternalTime = StopWithTime & {
   _t?: number | null;
@@ -124,7 +119,6 @@ function enforceDayTimeRules(
   });
 }
 
-/** ---------- Optional logging ---------- */
 async function logToGoogleSheets(payload: any) {
   const url = process.env.GSHEETS_WEBAPP_URL;
   if (!url) return;
@@ -171,22 +165,60 @@ Return JSON ONLY. No markdown. No code fences. No explanations. No extra text.
 
 Rules:
 - stops length must be 4–6 based on pace (relaxed=4, balanced=5, packed=6).
-- time should be realistic (e.g. 09:00, 10:30, 12:00, 14:00, 16:30, 19:00).
+- time should be realistic.
 - dailyCostEstimate must equal sum(costEstimate).
 `;
 
-/** ---------- Route ---------- */
 export async function POST(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return new Response(
-      JSON.stringify({ error: "Login required" }),
-      { status: 401 }
-    );
+    return new Response(JSON.stringify({ error: "Login required" }), {
+      status: 401,
+    });
   }
 
   try {
+    const supabase = createSupabaseServerClient();
+
+    /* ---------- Monthly plan limit check ---------- */
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // For now everyone is free until you add real plan data
+    const plan = "free";
+
+    const PLAN_LIMITS: Record<string, number> = {
+      free: 5,
+      plus: 25,
+      pro: Infinity,
+    };
+
+    const limit = PLAN_LIMITS[plan] ?? 5;
+
+    const { count, error: countError } = await supabase
+      .from("itineraries")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", monthStart.toISOString());
+
+    if (countError) {
+      console.error("Rate limit error:", countError);
+      return NextResponse.json(
+        { error: "Unable to check usage right now." },
+        { status: 500 }
+      );
+    }
+
+    if (limit !== Infinity && (count ?? 0) >= limit) {
+      return NextResponse.json(
+        {
+          error: `You have reached your monthly limit of ${limit} itineraries on the ${plan} plan.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
 
     const safe: GenerateRequest = {
@@ -195,17 +227,17 @@ export async function POST(req: Request) {
       people: (body.people ?? "solo") as PeopleType,
       budget: (body.budget ?? "mid") as GenerateRequest["budget"],
       startDate: body.startDate ? String(body.startDate) : undefined,
-
       arrivalTime: body.arrivalTime ? String(body.arrivalTime) : undefined,
       departTime: body.departTime ? String(body.departTime) : undefined,
       childAges: (body.childAges ?? "none") as ChildAges,
-
       pace: (body.pace ?? "balanced") as Pace,
       interests: Array.isArray(body.interests) ? body.interests : [],
     };
 
     const dates = safe.startDate
-      ? Array.from({ length: safe.days }).map((_, i) => addDays(safe.startDate!, i))
+      ? Array.from({ length: safe.days }).map((_, i) =>
+          addDays(safe.startDate!, i)
+        )
       : [];
 
     const userPrompt = `
@@ -224,7 +256,7 @@ Kids age group: ${safe.childAges ?? "none"}
 
 Constraints:
 - Return JSON ONLY matching the schema exactly. No extra keys.
-- Provide 4–6 stops depending on pace (relaxed=4, balanced=5, packed=6).
+- Provide 4–6 stops depending on pace.
 - If arrivalTime is provided, Day 1 must start AFTER that time.
 - If departTime is provided, last day must end BEFORE that time.
 - If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
@@ -256,7 +288,6 @@ Constraints:
       .slice(0, safe.days)
       .map((d: any, idx: number) => {
         const rawStops = Array.isArray(d.stops) ? d.stops : [];
-
         const isDay1 = idx === 0;
         const isLastDay = idx === safe.days - 1;
 
@@ -268,7 +299,10 @@ Constraints:
         const dailyCostEstimate =
           typeof d.dailyCostEstimate === "number"
             ? d.dailyCostEstimate
-            : fixedStops.reduce((sum, s: any) => sum + (Number(s.costEstimate) || 0), 0);
+            : fixedStops.reduce(
+                (sum, s: any) => sum + (Number(s.costEstimate) || 0),
+                0
+              );
 
         return {
           day: idx + 1,
@@ -279,7 +313,8 @@ Constraints:
             title: s.title || "Stop",
             area: s.area ?? undefined,
             notes: s.notes ?? undefined,
-            mapQuery: s.mapQuery || `${s.title || "Attraction"}, ${safe.destination}`,
+            mapQuery:
+              s.mapQuery || `${s.title || "Attraction"}, ${safe.destination}`,
             costEstimate: Number(s.costEstimate) || 0,
           })),
           dailyCostEstimate,
@@ -296,7 +331,39 @@ Constraints:
       },
     };
 
-    logToGoogleSheets({
+    const tripTitle = `${safe.days}-day ${safe.destination} (${safe.budget})`;
+
+    const { data: savedTrip, error: saveError } = await supabase
+      .from("itineraries")
+      .insert([
+        {
+          user_id: userId,
+          title: tripTitle,
+          destination: safe.destination,
+          start_date: safe.startDate ?? null,
+          end_date: safe.startDate
+            ? addDays(safe.startDate, safe.days - 1)
+            : null,
+          budget: safe.budget,
+          interests: safe.interests ?? [],
+          travellers:
+            safe.people === "solo" ? 1 : safe.people === "couple" ? 2 : 4,
+          raw_prompt: JSON.stringify(safe),
+          generated_plan: responseBody,
+        },
+      ])
+      .select("id, title, destination, created_at")
+      .single();
+
+    if (saveError) {
+      console.error("Supabase save error:", saveError);
+      return NextResponse.json(
+        { error: "Itinerary generated but failed to save" },
+        { status: 500 }
+      );
+    }
+
+    await logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
       days: safe.days,
@@ -309,9 +376,17 @@ Constraints:
       childAges: safe.childAges ?? "none",
       interests: safe.interests ?? [],
       source: "generate_api_openai",
+      savedTripId: savedTrip.id,
+      clerkUserId: userId,
+      plan,
+      monthlyCount: count ?? 0,
+      monthlyLimit: limit === Infinity ? "unlimited" : limit,
     });
 
-    return NextResponse.json(responseBody);
+    return NextResponse.json({
+      ...responseBody,
+      savedTrip,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || "Server error" },
