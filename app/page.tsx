@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import PlannerCard from "@/components/PlannerCard";
+import PricingButton from "@/components/PricingButtons";
 
 export default function Home() {
   return (
@@ -58,11 +59,15 @@ export default function Home() {
               </div>
               <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
                 <div className="font-semibold">Family-ready</div>
-                <div className="mt-1 text-xs text-gray-500">Kid-friendly flow</div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Kid-friendly flow
+                </div>
               </div>
               <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
                 <div className="font-semibold">Map-friendly</div>
-                <div className="mt-1 text-xs text-gray-500">Less backtracking</div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Less backtracking
+                </div>
               </div>
             </div>
           </div>
@@ -81,7 +86,9 @@ export default function Home() {
                   </span>
                 </div>
 
-                <h3 className="mt-2 text-lg font-semibold">Your trip, organised</h3>
+                <h3 className="mt-2 text-lg font-semibold">
+                  Your trip, organised
+                </h3>
 
                 <p className="mt-2 text-sm text-gray-700">
                   A clean day-by-day plan with smart routes, food picks, and
@@ -129,7 +136,9 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                How it works
+              </h2>
               <p className="mt-2 max-w-2xl text-gray-700">
                 A simple flow that turns your preferences into a day-by-day plan
                 you can actually follow.
@@ -254,7 +263,8 @@ export default function Home() {
             </div>
 
             <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">Cancel anytime</span> • No lock-in
+              <span className="font-medium text-gray-900">Cancel anytime</span>{" "}
+              • No lock-in
             </div>
           </div>
 
@@ -263,7 +273,9 @@ export default function Home() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Explorer</div>
-                  <div className="mt-1 text-sm text-gray-600">For trying Itenora</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For trying Itenora
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Free
@@ -276,10 +288,19 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> 2 itineraries / month</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Budget-friendly suggestions</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Save 1 trip</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Email support</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> 2 itineraries / month
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Budget-friendly
+                  suggestions
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Save 1 trip
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Email support
+                </li>
               </ul>
 
               <a
@@ -289,7 +310,9 @@ export default function Home() {
                 Start free
               </a>
 
-              <p className="mt-3 text-xs text-gray-500">No credit card required.</p>
+              <p className="mt-3 text-xs text-gray-500">
+                No credit card required.
+              </p>
             </div>
 
             <div className="relative rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
@@ -302,7 +325,9 @@ export default function Home() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Plus</div>
-                  <div className="mt-1 text-sm text-gray-600">For regular travel planning</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For regular travel planning
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Best value
@@ -315,19 +340,29 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> 20 itineraries / month</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Save up to 10 trips</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Export + share</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> No watermark</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Faster generation</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> 20 itineraries / month
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Save up to 10 trips
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Export + share
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> No watermark
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Faster generation
+                </li>
               </ul>
 
-              <a
-                href="#planner"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
+              <PricingButton
+                plan="plus"
+                className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black disabled:opacity-60"
               >
                 Upgrade to Plus
-              </a>
+              </PricingButton>
 
               <p className="mt-3 text-xs text-gray-500">
                 Great for families planning multiple days.
@@ -338,7 +373,9 @@ export default function Home() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Pro</div>
-                  <div className="mt-1 text-sm text-gray-600">For power users</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    For power users
+                  </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
                   Unlimited
@@ -351,26 +388,38 @@ export default function Home() {
               </div>
 
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Unlimited itineraries</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Advanced preferences</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Multi-city planning (coming soon)</li>
-                <li className="flex gap-2"><span className="mt-[2px]">✓</span> Priority support</li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Unlimited itineraries
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Advanced preferences
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Multi-city planning
+                  (coming soon)
+                </li>
+                <li className="flex gap-2">
+                  <span className="mt-[2px]">✓</span> Priority support
+                </li>
               </ul>
 
-              <a
-                href="#planner"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
+              <PricingButton
+                plan="pro"
+                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
               >
                 Go Pro
-              </a>
+              </PricingButton>
 
-              <p className="mt-3 text-xs text-gray-500">Best for frequent travellers.</p>
+              <p className="mt-3 text-xs text-gray-500">
+                Best for frequent travellers.
+              </p>
             </div>
           </div>
 
           <div className="mt-8 flex flex-col gap-2 text-sm text-gray-600 md:flex-row md:items-center md:justify-between">
             <p>
-              Prices shown in <span className="font-medium text-gray-900">AUD</span>.
+              Prices shown in{" "}
+              <span className="font-medium text-gray-900">AUD</span>.
             </p>
             <p>
               Questions?{" "}
@@ -395,7 +444,8 @@ export default function Home() {
             <div>
               <div className="text-sm font-semibold">Itenora</div>
               <div className="mt-1 text-sm text-gray-700">
-                Questions? Email: <span className="font-medium">hello@itenora.com</span>
+                Questions? Email:{" "}
+                <span className="font-medium">hello@itenora.com</span>
               </div>
             </div>
             <div className="text-xs text-gray-500">
@@ -419,7 +469,9 @@ function PlannerCardFallback() {
 function EarlyAccessCard() {
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm md:p-12">
-      <h2 className="text-2xl font-semibold tracking-tight">Want early access?</h2>
+      <h2 className="text-2xl font-semibold tracking-tight">
+        Want early access?
+      </h2>
       <p className="mt-3 text-gray-700">
         Leave your email and we’ll notify you when Itenora is ready.
       </p>
