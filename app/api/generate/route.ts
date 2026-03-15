@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { checkUsage } from "@/lib/usage";
+import { makeTripSlug, addSlugSuffix } from "@/lib/slug";
 
 /** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
@@ -349,11 +350,33 @@ Constraints:
 
     const tripTitle = `${safe.days}-day ${safe.destination} (${safe.budget})`;
 
+    /* ---------- Build unique slug ---------- */
+    const baseSlug = makeTripSlug({
+      destination: safe.destination,
+      days: safe.days,
+      budget: safe.budget,
+      people: safe.people,
+    });
+
+    let slug = baseSlug;
+
+    const { data: existingSlug } = await supabase
+      .from("itineraries")
+      .select("slug")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (existingSlug?.slug) {
+      slug = addSlugSuffix(baseSlug, Date.now().toString().slice(-6));
+    }
+
+    /* ---------- Save itinerary ---------- */
     const { data: savedTrip, error: saveError } = await supabase
       .from("itineraries")
       .insert([
         {
           user_id: userId,
+          slug,
           title: tripTitle,
           destination: safe.destination,
           start_date: safe.startDate ?? null,
@@ -368,7 +391,7 @@ Constraints:
           generated_plan: responseBody,
         },
       ])
-      .select("id, title, destination, created_at")
+      .select("id, slug, title, destination, created_at")
       .single();
 
     if (saveError) {
