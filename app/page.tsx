@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
@@ -141,9 +141,19 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="planner" className="mx-auto max-w-6xl px-4 pb-6 md:pb-10">
-        <PlannerCard />
-      </section>
+      function PlannerCardFallback() {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
+      <div className="text-sm text-gray-500">Loading planner...</div>
+    </div>
+  );
+}
+
+   <section id="planner" className="mx-auto max-w-6xl px-4 pb-6 md:pb-10">
+  <Suspense fallback={<PlannerCardFallback />}>
+    <PlannerCard />
+  </Suspense>
+</section>
 
       <section id="how" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-16">
