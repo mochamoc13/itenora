@@ -321,7 +321,7 @@ Destination: ${safe.destination}
 People: ${safe.people}
 Budget: ${safe.budget}
 Pace: ${safe.pace}
-Interests: ${safe.interests.join(", ") || "general highlights"}
+Interests: ${(safe.interests ?? []).join(", ") || "general highlights"}
 Dates: ${dates.length ? dates.join(", ") : "flexible"}
 
 Arrival time: ${safe.arrivalTime ?? "not provided"}
