@@ -9,12 +9,13 @@ import { makeTripSlug, addSlugSuffix } from "@/lib/slug";
 type PeopleType = "solo" | "couple" | "family";
 type Pace = "relaxed" | "balanced" | "packed";
 type ChildAges = "none" | "baby" | "toddler" | "kids" | "teens";
+type BudgetType = "budget" | "mid" | "premium";
 
 type GenerateRequest = {
   destination: string;
   days: number;
   people: PeopleType;
-  budget: "budget" | "mid" | "premium";
+  budget: BudgetType;
   startDate?: string;
   arrivalTime?: string;
   departTime?: string;
@@ -40,27 +41,60 @@ type ItineraryDay = {
   dailyCostEstimate: number;
 };
 
+type StopWithTime = { time?: string; [k: string]: unknown };
+type StopWithInternalTime = StopWithTime & {
+  _t?: number | null;
+};
+
+type ParsedAiItinerary = {
+  itinerary?: Array<{
+    day?: number;
+    date?: string | null;
+    theme?: string;
+    stops?: Array<{
+      time?: string;
+      title?: string;
+      area?: string | null;
+      notes?: string | null;
+      mapQuery?: string;
+      costEstimate?: number;
+    }>;
+    dailyCostEstimate?: number;
+  }>;
+};
+
 /** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
 function addDays(dateStr: string, add: number) {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + add);
+
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function isValidDateString(dateStr?: string) {
+  if (!dateStr) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
 function toMinutes(hhmm?: string) {
   if (!hhmm) return null;
+
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   if (!m) return null;
+
   const hh = Number(m[1]);
   const mm = Number(m[2]);
+
   if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+
   return hh * 60 + mm;
 }
 
@@ -70,10 +104,14 @@ function fmtMinutes(mins: number) {
   return `${hh}:${mm}`;
 }
 
-type StopWithTime = { time?: string; [k: string]: any };
-type StopWithInternalTime = StopWithTime & {
-  _t?: number | null;
-};
+function sanitizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
 
 function enforceDayTimeRules(
   stops: StopWithTime[],
@@ -121,7 +159,7 @@ function enforceDayTimeRules(
   });
 }
 
-async function logToGoogleSheets(payload: any) {
+async function logToGoogleSheets(payload: unknown) {
   const url = process.env.GSHEETS_WEBAPP_URL;
   if (!url) return;
 
@@ -132,7 +170,7 @@ async function logToGoogleSheets(payload: any) {
       body: JSON.stringify(payload),
     });
   } catch {
-    // ignore
+    // ignore logging failures
   }
 }
 
@@ -229,19 +267,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as Partial<GenerateRequest>;
 
     const safe: GenerateRequest = {
       destination: String(body.destination ?? "").trim(),
       days: clamp(Number(body.days ?? 3), 1, 14),
       people: (body.people ?? "solo") as PeopleType,
-      budget: (body.budget ?? "mid") as GenerateRequest["budget"],
+      budget: (body.budget ?? "mid") as BudgetType,
       startDate: body.startDate ? String(body.startDate) : undefined,
       arrivalTime: body.arrivalTime ? String(body.arrivalTime) : undefined,
       departTime: body.departTime ? String(body.departTime) : undefined,
       childAges: (body.childAges ?? "none") as ChildAges,
       pace: (body.pace ?? "balanced") as Pace,
-      interests: Array.isArray(body.interests) ? body.interests : [],
+      interests: sanitizeStringArray(body.interests),
     };
 
     if (!safe.destination) {
@@ -251,10 +289,29 @@ export async function POST(req: Request) {
       );
     }
 
+    if (safe.startDate && !isValidDateString(safe.startDate)) {
+      return NextResponse.json(
+        { error: "startDate must be in YYYY-MM-DD format" },
+        { status: 400 }
+      );
+    }
+
+    if (safe.arrivalTime && toMinutes(safe.arrivalTime) === null) {
+      return NextResponse.json(
+        { error: "arrivalTime must be in HH:MM format" },
+        { status: 400 }
+      );
+    }
+
+    if (safe.departTime && toMinutes(safe.departTime) === null) {
+      return NextResponse.json(
+        { error: "departTime must be in HH:MM format" },
+        { status: 400 }
+      );
+    }
+
     const dates = safe.startDate
-      ? Array.from({ length: safe.days }).map((_, i) =>
-          addDays(safe.startDate!, i)
-        )
+      ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate!, i))
       : [];
 
     const userPrompt = `
@@ -264,7 +321,7 @@ Destination: ${safe.destination}
 People: ${safe.people}
 Budget: ${safe.budget}
 Pace: ${safe.pace}
-Interests: ${(safe.interests ?? []).join(", ") || "general highlights"}
+Interests: ${safe.interests.join(", ") || "general highlights"}
 Dates: ${dates.length ? dates.join(", ") : "flexible"}
 
 Arrival time: ${safe.arrivalTime ?? "not provided"}
@@ -291,9 +348,9 @@ Constraints:
 
     const text = completion.choices[0]?.message?.content ?? "";
 
-    let parsed: any;
+    let parsed: ParsedAiItinerary;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text) as ParsedAiItinerary;
     } catch {
       return NextResponse.json(
         { error: "AI returned non-JSON", raw: text },
@@ -303,8 +360,11 @@ Constraints:
 
     const itinerary: ItineraryDay[] = (parsed.itinerary ?? [])
       .slice(0, safe.days)
-      .map((d: any, idx: number) => {
-        const rawStops = Array.isArray(d.stops) ? d.stops : [];
+      .map((d, idx) => {
+        const rawStops = Array.isArray(d.stops)
+          ? (d.stops as StopWithTime[])
+          : [];
+
         const isDay1 = idx === 0;
         const isLastDay = idx === safe.days - 1;
 
@@ -313,27 +373,28 @@ Constraints:
           maxEnd: isLastDay ? safe.departTime ?? null : null,
         });
 
-        const dailyCostEstimate =
-          typeof d.dailyCostEstimate === "number"
-            ? d.dailyCostEstimate
-            : fixedStops.reduce(
-                (sum, s: any) => sum + (Number(s.costEstimate) || 0),
-                0
-              );
+        const normalizedStops: ItineraryStop[] = fixedStops.map((s) => ({
+          time: typeof s.time === "string" ? s.time : "09:00",
+          title: typeof s.title === "string" ? s.title : "Stop",
+          area: typeof s.area === "string" ? s.area : undefined,
+          notes: typeof s.notes === "string" ? s.notes : undefined,
+          mapQuery:
+            typeof s.mapQuery === "string" && s.mapQuery.trim()
+              ? s.mapQuery
+              : `${typeof s.title === "string" ? s.title : "Attraction"}, ${safe.destination}`,
+          costEstimate: Number(s.costEstimate) || 0,
+        }));
+
+        const dailyCostEstimate = normalizedStops.reduce(
+          (sum, stop) => sum + stop.costEstimate,
+          0
+        );
 
         return {
           day: idx + 1,
           date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
           theme: d.theme || `Day ${idx + 1}`,
-          stops: fixedStops.map((s: any) => ({
-            time: s.time || "09:00",
-            title: s.title || "Stop",
-            area: s.area ?? undefined,
-            notes: s.notes ?? undefined,
-            mapQuery:
-              s.mapQuery || `${s.title || "Attraction"}, ${safe.destination}`,
-            costEstimate: Number(s.costEstimate) || 0,
-          })),
+          stops: normalizedStops,
           dailyCostEstimate,
         };
       });
@@ -384,7 +445,7 @@ Constraints:
             ? addDays(safe.startDate, safe.days - 1)
             : null,
           budget: safe.budget,
-          interests: safe.interests ?? [],
+          interests: safe.interests,
           travellers:
             safe.people === "solo" ? 1 : safe.people === "couple" ? 2 : 4,
           raw_prompt: JSON.stringify(safe),
@@ -415,7 +476,7 @@ Constraints:
       arrivalTime: safe.arrivalTime ?? "",
       departTime: safe.departTime ?? "",
       childAges: safe.childAges ?? "none",
-      interests: safe.interests ?? [],
+      interests: safe.interests,
       source: "generate_api_openai",
       savedTripId: savedTrip.id,
       clerkUserId: userId,
@@ -433,10 +494,11 @@ Constraints:
         limit: usage.limit === Infinity ? "unlimited" : usage.limit,
       },
     });
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message || "Server error" },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Server error";
+
+    console.error("Generate route error:", message);
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

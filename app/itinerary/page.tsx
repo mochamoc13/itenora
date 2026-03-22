@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import UsageSummary from "@/components/UsageSummary";
 
 export default async function ItineraryPage() {
   const { userId } = await auth();
@@ -34,21 +35,25 @@ export default async function ItineraryPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
-          <p className="mt-2 text-gray-600">
-            Your saved itineraries, ready to open anytime.
-          </p>
-        </div>
+   <div className="mb-8 flex items-start justify-between gap-4">
+  <div className="flex-1">
+    <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
+    <p className="mt-2 text-gray-600">
+      Your saved itineraries, ready to open anytime.
+    </p>
 
-        <Link
-          href="/#planner"
-          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          New Trip
-        </Link>
-      </div>
+    <div className="mt-4 max-w-md">
+      <UsageSummary />
+    </div>
+  </div>
+
+  <Link
+    href="/#planner"
+    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+  >
+    New Trip
+  </Link>
+</div>
 
       {!trips || trips.length === 0 ? (
         <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-sm">

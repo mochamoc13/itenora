@@ -14,9 +14,9 @@ export async function checkUsage(userId: string) {
   const plan = data?.plan || "free";
   const used = data?.itineraries || 0;
 
-  let limit = 2;
+  let limit = 4;
   if (plan === "plus") limit = 20;
-  if (plan === "pro") limit = Infinity;
+  if (plan === "pro") limit = 100;
 
   return {
     plan,

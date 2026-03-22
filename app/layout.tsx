@@ -1,5 +1,8 @@
 import "./globals.css";
+
 import Link from "next/link";
+
+import AccountBillingArea from "@/components/AccountBillingArea";
 import {
   ClerkProvider,
   SignedIn,
@@ -42,23 +45,25 @@ export default function RootLayout({
                   </SignInButton>
                 </SignedOut>
 
-                <SignedIn>
-                  <Link
-                    href="/itinerary"
-                    className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                  >
-                    My Trips
-                  </Link>
+<SignedIn>
+  <Link
+    href="/itinerary"
+    className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+  >
+    My Trips
+  </Link>
 
-                  <UserButton
-                    afterSignOutUrl="/"
-                    appearance={{
-                      elements: {
-                        avatarBox: "h-10 w-10",
-                      },
-                    }}
-                  />
-                </SignedIn>
+  <AccountBillingArea />
+
+  <UserButton
+    afterSignOutUrl="/"
+    appearance={{
+      elements: {
+        avatarBox: "h-10 w-10",
+      },
+    }}
+  />
+</SignedIn>
               </div>
             </div>
           </header>

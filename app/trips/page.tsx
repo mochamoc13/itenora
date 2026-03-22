@@ -1,86 +1,138 @@
-"use client";
+import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import UsageSummary from "@/components/UsageSummary";
 
-import React from "react";
+export default async function TripsPage() {
+  const { userId } = await auth();
 
-export const dynamic = "force-dynamic";
+  if (!userId) {
+    redirect("/sign-in?redirect_url=/trips");
+  }
 
-type SavedTrip = {
-  id: string;
-  title: string;
-  destination: string;
-  startDate: string | null;
-  createdAt: string;
-};
+  const supabase = createSupabaseServerClient();
 
-const KEY = "itenora:savedTrips";
+  const { data: trips, error } = await supabase
+    .from("itineraries")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-export default function TripsPage() {
-  const [trips, setTrips] = React.useState<SavedTrip[]>([]);
+  if (error) {
+    console.error("Supabase load error:", error);
 
-  React.useEffect(() => {
-    const raw = localStorage.getItem(KEY);
-    const list = raw ? JSON.parse(raw) : [];
-    setTrips(list);
-  }, []);
-
-  const removeTrip = (id: string) => {
-    const next = trips.filter((t) => t.id !== id);
-    setTrips(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
-  };
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-10">
+        <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
+        <p className="mt-4 text-red-600">Failed to load trips.</p>
+        <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          {error.message}
+        </pre>
+      </main>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Saved trips</h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            Saved on this device (browser). No account needed.
+    <main className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mb-8">
+        <UsageSummary />
+      </div>
+
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
+          <p className="mt-2 text-gray-600">
+            Your saved itineraries, ready to open anytime.
           </p>
         </div>
 
-        <a className="rounded-xl border px-4 py-2 hover:bg-neutral-50" href="/">
-          New trip
-        </a>
+        <Link
+          href="/#planner"
+          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          New Trip
+        </Link>
       </div>
 
-      {trips.length === 0 ? (
-        <div className="mt-6 rounded-2xl border p-6 text-neutral-600">
-          No saved trips yet. Generate an itinerary, then click{" "}
-          <b>Save trip details</b>.
+      {!trips || trips.length === 0 ? (
+        <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+          <h2 className="text-xl font-semibold">No trips yet</h2>
+          <p className="mt-2 text-gray-600">
+            Generate your first itinerary and it will show up here.
+          </p>
+
+          <Link
+            href="/#planner"
+            className="mt-6 inline-flex rounded-xl bg-gray-900 px-5 py-3 text-sm font-medium text-white hover:opacity-90"
+          >
+            Plan your first trip
+          </Link>
         </div>
       ) : (
-        <div className="mt-6 grid gap-4">
-          {trips.map((t) => (
-            <div key={t.id} className="rounded-2xl border p-5 shadow-sm">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-lg font-semibold">{t.title}</div>
-                  <div className="mt-1 text-sm text-neutral-600">
-                    Saved {new Date(t.createdAt).toLocaleString()}
+        <div className="grid gap-4">
+          {trips.map((trip: any) => {
+            const input = trip.generated_plan?.input ?? {};
+            const days =
+              typeof input.days === "number"
+                ? input.days
+                : Array.isArray(trip.generated_plan?.itinerary)
+                ? trip.generated_plan.itinerary.length
+                : null;
+
+            const people = input.people ?? null;
+            const budget = input.budget ?? trip.budget ?? null;
+            const createdAt = trip.created_at
+              ? new Date(trip.created_at).toLocaleDateString()
+              : "";
+
+            return (
+              <Link
+                key={trip.id}
+                href={`/trips/${trip.id}`}
+                className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+                      {trip.title || "Untitled Trip"}
+                    </h2>
+
+                    <p className="mt-1 text-gray-600">
+                      {trip.destination || "No destination"}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
+                      {days ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                          {days} day{days > 1 ? "s" : ""}
+                        </span>
+                      ) : null}
+
+                      {people ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                          {people}
+                        </span>
+                      ) : null}
+
+                      {budget ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                          {budget}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-gray-500 sm:text-right">
+                    <p>Created</p>
+                    <p className="font-medium text-gray-700">{createdAt}</p>
                   </div>
                 </div>
-
-                <div className="flex gap-2">
-                  <a
-                    className="rounded-xl border px-4 py-2 hover:bg-neutral-50"
-                    href={`/trips/${encodeURIComponent(t.id)}`}
-                  >
-                    Open
-                  </a>
-
-                  <button
-                    className="rounded-xl border px-4 py-2 hover:bg-neutral-50"
-                    onClick={() => removeTrip(t.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
-    </div>
+    </main>
   );
 }

@@ -262,14 +262,25 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">Cancel anytime</span>{" "}
-              • No lock-in
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              Try risk-free • Cancel anytime • No lock-in
             </div>
           </div>
 
+          <div className="mt-4">
+            <p className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              Early access offer: Free plan temporarily includes 4 itineraries
+              instead of 2
+            </p>
+          </div>
+
           <div className="mt-10 grid gap-5 md:grid-cols-3">
-            <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
+            <div className="relative rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
+              <div className="absolute -top-3 left-6 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow">
+                EARLY ACCESS
+              </div>
+
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">Explorer</div>
@@ -287,27 +298,38 @@ export default function Home() {
                 <div className="text-sm text-gray-500">/month</div>
               </div>
 
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="text-xs font-semibold text-amber-700">
+                  🎉 EARLY ACCESS BONUS
+                </div>
+                <div className="mt-2 text-sm text-gray-500 line-through">
+                  Normally 2 itineraries / month
+                </div>
+                <div className="mt-1 text-xl font-bold text-amber-700">
+                  4 itineraries / month
+                </div>
+                <div className="mt-1 text-xs text-amber-700">
+                  Free upgrade for a limited time
+                </div>
+              </div>
+
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> 2 itineraries / month
+                  <span>✓</span> Budget-friendly suggestions
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Budget-friendly
-                  suggestions
+                  <span>✓</span> Save 1 trip
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Save 1 trip
-                </li>
-                <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Email support
+                  <span>✓</span> Email support
                 </li>
               </ul>
 
               <a
                 href="#planner"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
+                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-amber-300 bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600"
               >
-                Start free
+                Start free (4 trips)
               </a>
 
               <p className="mt-3 text-xs text-gray-500">
@@ -339,23 +361,31 @@ export default function Home() {
                 <div className="text-sm text-gray-500">/month</div>
               </div>
 
+              <p className="mt-2 text-xs font-medium text-emerald-600">
+                ✔ Cancel anytime • No lock-in
+              </p>
+
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> 20 itineraries / month
+                  <span>✓</span> 20 itineraries / month
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Save up to 10 trips
+                  <span>✓</span> Save up to 10 trips
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Export + share
+                  <span>✓</span> Export + share
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> No watermark
+                  <span>✓</span> No watermark
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Faster generation
+                  <span>✓</span> Faster generation
                 </li>
               </ul>
+
+              <div className="mt-4 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                Good for occasional and family trip planning
+              </div>
 
               <PricingButton
                 plan="plus"
@@ -374,11 +404,11 @@ export default function Home() {
                 <div>
                   <div className="text-lg font-semibold">Pro</div>
                   <div className="mt-1 text-sm text-gray-600">
-                    For power users
+                    For frequent travellers
                   </div>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600">
-                  Unlimited
+                  Premium
                 </span>
               </div>
 
@@ -387,21 +417,38 @@ export default function Home() {
                 <div className="text-sm text-gray-500">/month</div>
               </div>
 
+              <p className="mt-2 text-xs font-medium text-emerald-600">
+                ✔ Cancel anytime • No lock-in
+              </p>
+
               <ul className="mt-6 space-y-3 text-sm text-gray-700">
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Unlimited itineraries
+                  <span>✓</span> Unlimited itineraries*
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Advanced preferences
+                  <span>✓</span> Advanced itinerary editing
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Multi-city planning
-                  (coming soon)
+                  <span>✓</span> Smart travel preferences
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-[2px]">✓</span> Priority support
+                  <span>✓</span> Regenerate specific days (Coming soon)
+                </li>
+                <li className="flex gap-2">
+                  <span>✓</span> Priority processing
                 </li>
               </ul>
+
+              <div className="mt-4 rounded-2xl border border-purple-200 bg-purple-50 p-4">
+                <div className="text-xs font-semibold text-purple-700">
+                  BEST FOR FREQUENT TRAVELLERS
+                </div>
+                <div className="mt-2 text-sm text-purple-800">
+                  More control, smarter planning, and faster trip building.
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-500">*Fair usage applies</p>
 
               <PricingButton
                 plan="pro"
@@ -411,7 +458,7 @@ export default function Home() {
               </PricingButton>
 
               <p className="mt-3 text-xs text-gray-500">
-                Best for frequent travellers.
+                Best for frequent travellers and repeat planning.
               </p>
             </div>
           </div>
@@ -434,8 +481,22 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="cta" className="mx-auto max-w-6xl px-4 py-16">
-        <EarlyAccessCard />
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div className="rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm md:p-12">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Start planning your next trip today
+          </h2>
+          <p className="mt-3 text-gray-700">
+            It takes less than 60 seconds to generate your first itinerary.
+          </p>
+
+          <a
+            href="#planner"
+            className="mt-6 inline-flex rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
+          >
+            Start planning
+          </a>
+        </div>
       </section>
 
       <footer id="contact" className="border-t border-gray-200 bg-gray-50">
@@ -462,34 +523,6 @@ function PlannerCardFallback() {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
       <div className="text-sm text-gray-500">Loading planner...</div>
-    </div>
-  );
-}
-
-function EarlyAccessCard() {
-  return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm md:p-12">
-      <h2 className="text-2xl font-semibold tracking-tight">
-        Want early access?
-      </h2>
-      <p className="mt-3 text-gray-700">
-        Leave your email and we’ll notify you when Itenora is ready.
-      </p>
-      <form className="mt-6 flex flex-col gap-3 sm:flex-row" action="#">
-        <input
-          type="email"
-          required
-          placeholder="you@email.com"
-          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-gray-900"
-        />
-        <button
-          type="submit"
-          className="rounded-xl bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-[1.02]"
-        >
-          Notify me
-        </button>
-      </form>
-      <p className="mt-3 text-xs text-gray-500">No spam. Unsubscribe anytime.</p>
     </div>
   );
 }

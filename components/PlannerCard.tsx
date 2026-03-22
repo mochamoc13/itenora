@@ -18,6 +18,12 @@ const BUDGET_MAP: Record<string, "budget" | "mid" | "premium"> = {
   Luxury: "premium",
 };
 
+type UsageInfo = {
+  plan: string;
+  used: number;
+  limit: number | "unlimited";
+};
+
 export default function PlannerCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -96,6 +102,37 @@ export default function PlannerCard() {
 
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [usage, setUsage] = React.useState<{
+  plan: string;
+  used: number;
+  limit: number | "unlimited";
+} | null>(null);
+
+React.useEffect(() => {
+  let cancelled = false;
+
+  async function loadUsage() {
+    try {
+      const res = await fetch("/api/user/usage", {
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!cancelled && res.ok) {
+        setUsage(data);
+      }
+    } catch (err) {
+      console.error("Failed to load usage");
+    }
+  }
+
+  loadUsage();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const toggleInterest = (t: string) => {
     setSelected((prev) =>
@@ -141,7 +178,19 @@ export default function PlannerCard() {
 
       const data = await res.json();
 
+      if (data?.usage) {
+        setUsage(data.usage);
+      }
+
       if (!res.ok) {
+        if (res.status === 429) {
+          setError(
+            data.error ||
+              "You have reached your monthly limit. Please upgrade to continue."
+          );
+          return;
+        }
+
         throw new Error(data.error || "Failed to generate itinerary");
       }
 
@@ -151,8 +200,10 @@ export default function PlannerCard() {
       }
 
       router.push("/itinerary");
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -176,6 +227,19 @@ export default function PlannerCard() {
           <span className="font-medium text-gray-700">Cancel anytime</span>
         </div>
       </div>
+
+      {usage && (
+        <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 text-sm">
+          <div className="font-semibold capitalize">{usage.plan} plan</div>
+          {usage.limit === "unlimited" ? (
+            <div className="mt-1 text-green-600">Unlimited itinerary generation</div>
+          ) : (
+            <div className="mt-1 text-gray-600">
+              {usage.used} / {usage.limit} itineraries used this month
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 md:grid-cols-12">
         <form
@@ -202,7 +266,11 @@ export default function PlannerCard() {
               <label className="text-xs font-semibold text-gray-700">People</label>
               <select
                 value={people}
-                onChange={(e) => setPeople(e.target.value as any)}
+                onChange={(e) =>
+                  setPeople(
+                    e.target.value as "Solo" | "Couple" | "Friends" | "Family"
+                  )
+                }
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
               >
                 <option>Solo</option>
@@ -231,7 +299,11 @@ export default function PlannerCard() {
               </label>
               <select
                 value={budget}
-                onChange={(e) => setBudget(e.target.value as any)}
+                onChange={(e) =>
+                  setBudget(
+                    e.target.value as "Budget" | "Mid" | "Comfort" | "Luxury"
+                  )
+                }
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
               >
                 <option>Budget</option>
@@ -289,7 +361,16 @@ export default function PlannerCard() {
               </label>
               <select
                 value={childAges}
-                onChange={(e) => setChildAges(e.target.value as any)}
+                onChange={(e) =>
+                  setChildAges(
+                    e.target.value as
+                      | "none"
+                      | "baby"
+                      | "toddler"
+                      | "kids"
+                      | "teens"
+                  )
+                }
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
               >
                 <option value="none">No kids / not specified</option>
@@ -368,11 +449,37 @@ export default function PlannerCard() {
                 </button>
               </SignedIn>
 
-              {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+            {error && (
+  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+    <p className="text-sm text-red-700 font-medium">{error}</p>
 
-              <p className="mt-2 text-xs text-gray-500">
-                This will generate and save your itinerary.
-              </p>
+    {error.toLowerCase().includes("limit") && (
+      <div className="mt-3 flex gap-2">
+        <a
+          href="#pricing"
+          className="rounded-lg bg-black px-4 py-2 text-sm text-white"
+        >
+          Upgrade plan
+        </a>
+
+        <button
+          onClick={() => setError("")}
+          className="rounded-lg border px-4 py-2 text-sm"
+        >
+          Dismiss
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
+              {usage && (
+  <p className="mt-2 text-xs text-gray-500">
+    {usage.plan === "pro"
+      ? `${usage.used} itineraries generated (unlimited)`
+      : `${usage.used} / ${usage.limit} itineraries used this month`}
+  </p>
+)}
             </div>
           </div>
         </form>
@@ -412,14 +519,16 @@ export default function PlannerCard() {
                   </div>
                   <div className="mt-1 text-gray-700">{d.summary}</div>
                   <div className="mt-2 text-xs text-gray-500">
-                    Est. spend: <span className="font-medium text-gray-700">{d.spend}</span>
+                    Est. spend:{" "}
+                    <span className="font-medium text-gray-700">{d.spend}</span>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-3 text-xs text-gray-600">
-              Includes: transport tips • cost hints • family pacing • map-friendly stops
+              Includes: transport tips • cost hints • family pacing • map-friendly
+              stops
             </div>
           </div>
         </div>
