@@ -325,9 +325,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const dates = safe.startDate
-      ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate, i))
-      : [];
+   const startDate = safe.startDate;
+const dates = startDate
+  ? Array.from({ length: safe.days }, (_, i) => addDays(startDate, i))
+  : [];
 
     const interestsText =
       Array.isArray(safe.interests) && safe.interests.length > 0
