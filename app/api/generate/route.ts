@@ -21,7 +21,7 @@ type GenerateRequest = {
   departTime?: string;
   childAges?: ChildAges;
   pace?: Pace;
-  interests: string[];
+  interests?: string[];
 };
 
 type ItineraryStop = {
@@ -41,7 +41,16 @@ type ItineraryDay = {
   dailyCostEstimate: number;
 };
 
-type StopWithTime = { time?: string; [k: string]: unknown };
+type StopWithTime = {
+  time?: string;
+  title?: string;
+  area?: string | null;
+  notes?: string | null;
+  mapQuery?: string;
+  costEstimate?: number;
+  [k: string]: unknown;
+};
+
 type StopWithInternalTime = StopWithTime & {
   _t?: number | null;
 };
@@ -269,7 +278,13 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as Partial<GenerateRequest>;
 
-    const safe: GenerateRequest = {
+    const safe: Required<
+      Omit<GenerateRequest, "startDate" | "arrivalTime" | "departTime">
+    > & {
+      startDate?: string;
+      arrivalTime?: string;
+      departTime?: string;
+    } = {
       destination: String(body.destination ?? "").trim(),
       days: clamp(Number(body.days ?? 3), 1, 14),
       people: (body.people ?? "solo") as PeopleType,
@@ -311,8 +326,13 @@ export async function POST(req: Request) {
     }
 
     const dates = safe.startDate
-      ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate!, i))
+      ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate, i))
       : [];
+
+    const interestsText =
+      Array.isArray(safe.interests) && safe.interests.length > 0
+        ? safe.interests.join(", ")
+        : "general highlights";
 
     const userPrompt = `
 Create a ${safe.days}-day itinerary.
@@ -321,7 +341,7 @@ Destination: ${safe.destination}
 People: ${safe.people}
 Budget: ${safe.budget}
 Pace: ${safe.pace}
-Interests: ${safe.interests.length ? safe.interests.join(", ") : "general highlights"}
+Interests: ${interestsText}
 Dates: ${dates.length ? dates.join(", ") : "flexible"}
 
 Arrival time: ${safe.arrivalTime ?? "not provided"}
