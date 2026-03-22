@@ -20,23 +20,47 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("stripe_customer_id")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    const stripeCustomerId = data?.stripe_customer_id;
+    let stripeCustomerId = profile?.stripe_customer_id ?? null;
+
+    if (stripeCustomerId) {
+      try {
+        const existing = await stripe.customers.retrieve(stripeCustomerId);
+
+        if ("deleted" in existing && existing.deleted) {
+          stripeCustomerId = null;
+        }
+      } catch {
+        stripeCustomerId = null;
+      }
+    }
 
     if (!stripeCustomerId) {
-      return NextResponse.json(
-        { error: "No Stripe customer found for this user" },
-        { status: 400 }
-      );
+      const customer = await stripe.customers.create({
+        metadata: {
+          clerk_user_id: userId,
+        },
+      });
+
+      stripeCustomerId = customer.id;
+
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq("user_id", userId);
+
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
