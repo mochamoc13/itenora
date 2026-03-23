@@ -356,7 +356,9 @@ export default async function Home() {
                 </button>
               ) : (
                 <div className="mt-7">
-                  <ManageBillingButton />
+                  <ManageBillingButton className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
+                    Manage billing
+                  </ManageBillingButton>
                 </div>
               )}
 
@@ -427,7 +429,9 @@ export default async function Home() {
                 </button>
               ) : currentPlan === "pro" ? (
                 <div className="mt-7">
-                  <ManageBillingButton />
+                  <ManageBillingButton className="inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
+                    Manage billing
+                  </ManageBillingButton>
                 </div>
               ) : (
                 <PricingButton
@@ -499,45 +503,29 @@ export default async function Home() {
 
               <p className="mt-4 text-xs text-gray-500">*Fair usage applies</p>
 
-{currentPlan === "pro" ? (
-  <button
-    disabled
-    className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
-  >
-    Current plan
-  </button>
-) : currentPlan === "plus" ? (
-  <ManageBillingButton className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
-    Upgrade to Pro
-  </ManageBillingButton>
-) : (
-  <PricingButton
-    plan="pro"
-    className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
-  >
-    Go Pro
-  </PricingButton>
-)}
+              {currentPlan === "pro" ? (
+                <button
+                  disabled
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                >
+                  Current plan
+                </button>
+              ) : (
+                <PricingButton
+                  plan="pro"
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {currentPlan === "plus" ? "Upgrade to Pro" : "Go Pro"}
+                </PricingButton>
+              )}
 
-{currentPlan === "pro" ? (
-  <button
-    disabled
-    className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
-  >
-    Current plan
-  </button>
-) : currentPlan === "plus" ? (
-  <ManageBillingButton className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
-    Upgrade to Pro
-  </ManageBillingButton>
-) : (
-  <PricingButton
-    plan="pro"
-    className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
-  >
-    Go Pro
-  </PricingButton>
-)}
+              <p className="mt-3 text-xs text-gray-500">
+                {currentPlan === "pro"
+                  ? "You are currently on Pro."
+                  : currentPlan === "plus"
+                  ? "Upgrade your Plus plan to Pro."
+                  : "Best for frequent travellers and repeat planning."}
+              </p>
             </div>
           </div>
 
