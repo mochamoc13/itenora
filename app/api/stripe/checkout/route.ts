@@ -12,16 +12,26 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function getOrCreateCustomer(userId: string) {
+type AppPlan = "free" | "plus" | "pro";
+
+async function getProfile(userId: string) {
   const { data: profile, error } = await supabaseAdmin
     .from("profiles")
-    .select("stripe_customer_id")
+    .select("plan, stripe_customer_id")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
 
-  let stripeCustomerId = profile?.stripe_customer_id ?? null;
+  return {
+    plan: (profile?.plan as AppPlan | null) ?? "free",
+    stripeCustomerId: profile?.stripe_customer_id ?? null,
+  };
+}
+
+async function getOrCreateCustomer(userId: string) {
+  const profile = await getProfile(userId);
+  let stripeCustomerId = profile.stripeCustomerId;
 
   if (stripeCustomerId) {
     try {
@@ -50,6 +60,20 @@ async function getOrCreateCustomer(userId: string) {
   return customer.id;
 }
 
+async function findActiveSubscription(customerId: string) {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+
+  return (
+    subscriptions.data.find((sub) =>
+      ["active", "trialing", "past_due", "unpaid"].includes(sub.status)
+    ) ?? null
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -59,60 +83,97 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const plan = body?.plan === "pro" ? "pro" : "plus";
+    const requestedPlan: AppPlan =
+      body?.plan === "pro" ? "pro" : body?.plan === "plus" ? "plus" : "free";
 
-    const plusPrice = process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID;
-    const proPrice = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+    if (requestedPlan === "free") {
+      return NextResponse.json(
+        { error: "Free plan does not use checkout" },
+        { status: 400 }
+      );
+    }
 
-    const priceId = plan === "pro" ? proPrice : plusPrice;
+    const plusPrice = process.env.STRIPE_PLUS_PRICE_ID;
+    const proPrice = process.env.STRIPE_PRO_PRICE_ID;
 
-    if (!priceId) {
+    const targetPriceId = requestedPlan === "pro" ? proPrice : plusPrice;
+
+    if (!targetPriceId) {
       return NextResponse.json(
         {
-          error: `Missing Stripe price ID for ${plan}`,
-          debug: {
-            plan,
-            plusPrice,
-            proPrice,
-          },
+          error: `Missing Stripe price ID for ${requestedPlan}`,
         },
         { status: 500 }
       );
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const profile = await getProfile(userId);
     const customerId = await getOrCreateCustomer(userId);
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    // If user is already on the requested plan, just send them back.
+    if (profile.plan === requestedPlan) {
+      return NextResponse.json({
+        url: `${siteUrl}/trips`,
+      });
+    }
 
+    // If user is already paid and wants Pro, upgrade the existing subscription in Stripe
+    // instead of trying to create a second checkout subscription.
+    if (profile.plan === "plus" && requestedPlan === "pro") {
+      const activeSubscription = await findActiveSubscription(customerId);
+
+      if (!activeSubscription) {
+        return NextResponse.json(
+          { error: "No active Plus subscription found to upgrade." },
+          { status: 400 }
+        );
+      }
+
+      const subscriptionItem = activeSubscription.items.data[0];
+
+      if (!subscriptionItem) {
+        return NextResponse.json(
+          { error: "No subscription item found to upgrade." },
+          { status: 400 }
+        );
+      }
+
+      await stripe.subscriptions.update(activeSubscription.id, {
+        items: [
+          {
+            id: subscriptionItem.id,
+            price: targetPriceId,
+          },
+        ],
+        proration_behavior: "create_prorations",
+      });
+
+      return NextResponse.json({
+        url: `${siteUrl}/trips`,
+      });
+    }
+
+    // Free -> Plus or Free -> Pro uses Checkout
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      payment_method_types: ["card"],
+      line_items: [{ price: targetPriceId, quantity: 1 }],
       success_url: `${siteUrl}/trips`,
       cancel_url: `${siteUrl}/trips`,
       allow_promotion_codes: true,
       metadata: {
         clerk_user_id: userId,
-        selected_plan: plan,
+        selected_plan: requestedPlan,
       },
     });
 
-    return NextResponse.json({
-      url: session.url,
-    });
+    return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : "Failed to create checkout session";
 
-    return NextResponse.json(
-      {
-        error: message,
-        debug: {
-          plusPrice: process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID,
-          proPrice: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
-        },
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
