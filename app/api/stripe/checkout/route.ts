@@ -1,13 +1,54 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2026-02-25.clover",
+});
 
-const ALLOWED_PRICE_IDS = [
-  process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID,
-  process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
-].filter(Boolean) as string[];
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function getOrCreateCustomer(userId: string) {
+  const { data: profile, error } = await supabaseAdmin
+    .from("profiles")
+    .select("stripe_customer_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  let stripeCustomerId = profile?.stripe_customer_id ?? null;
+
+  if (stripeCustomerId) {
+    try {
+      const existing = await stripe.customers.retrieve(stripeCustomerId);
+      if (!("deleted" in existing && existing.deleted)) {
+        return stripeCustomerId;
+      }
+    } catch {
+      stripeCustomerId = null;
+    }
+  }
+
+  const customer = await stripe.customers.create({
+    metadata: {
+      clerk_user_id: userId,
+    },
+  });
+
+  const { error: updateError } = await supabaseAdmin
+    .from("profiles")
+    .update({ stripe_customer_id: customer.id })
+    .eq("user_id", userId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  return customer.id;
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,57 +58,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const priceId = body?.priceId as string | undefined;
+    const body = await req.json().catch(() => ({}));
+    const plan = body?.plan === "pro" ? "pro" : "plus";
+
+    const priceId =
+      plan === "pro"
+        ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
+        : process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID;
 
     if (!priceId) {
-      return NextResponse.json({ error: "Missing priceId" }, { status: 400 });
-    }
-
-    if (!ALLOWED_PRICE_IDS.includes(priceId)) {
-      return NextResponse.json({ error: "Invalid priceId" }, { status: 400 });
-    }
-
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-    if (!siteUrl) {
       return NextResponse.json(
-        { error: "Missing NEXT_PUBLIC_SITE_URL" },
+        { error: `Missing Stripe price ID for ${plan}` },
         { status: 500 }
       );
     }
+
+    const customerId = await getOrCreateCustomer(userId);
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      payment_method_types: ["card"],
-    
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      client_reference_id: userId,
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${siteUrl}/trips`,
+      cancel_url: `${siteUrl}/trips`,
+      allow_promotion_codes: true,
       metadata: {
-        clerkUserId: userId,
+        clerk_user_id: userId,
+        selected_plan: plan,
       },
-      success_url: `${siteUrl}/trips?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/#pricing`,
     });
-
-    if (!session.url) {
-      return NextResponse.json(
-        { error: "Stripe did not return a checkout URL" },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     const message =
-      err instanceof Error ? err.message : "Stripe checkout failed";
-
-    console.error("Checkout route error:", message);
+      err instanceof Error ? err.message : "Failed to create checkout session";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
