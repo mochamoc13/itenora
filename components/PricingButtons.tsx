@@ -2,10 +2,17 @@
 
 type PricingButtonProps = {
   plan: "plus" | "pro";
-  label: string;
+  label?: string;
+  className?: string;
+  children?: React.ReactNode;
 };
 
-export default function PricingButton({ plan, label }: PricingButtonProps) {
+export default function PricingButton({
+  plan,
+  label,
+  className = "",
+  children,
+}: PricingButtonProps) {
   async function handleClick() {
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -32,9 +39,9 @@ export default function PricingButton({ plan, label }: PricingButtonProps) {
   return (
     <button
       onClick={handleClick}
-      className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black"
+      className={className || "inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black"}
     >
-      {label}
+      {children ?? label}
     </button>
   );
 }
