@@ -1,8 +1,29 @@
 import { Suspense } from "react";
+import { auth } from "@clerk/nextjs/server";
 import PlannerCard from "@/components/PlannerCard";
 import PricingButton from "@/components/PricingButtons";
+import ManageBillingButton from "@/components/ManageBillingButton";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
+
+  let currentPlan: "free" | "plus" | "pro" = "free";
+
+  if (userId) {
+    const supabase = createSupabaseServerClient();
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profile?.plan === "plus" || profile?.plan === "pro") {
+      currentPlan = profile.plan;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-orange-50 text-gray-900">
       {/* Hero */}
@@ -276,6 +297,7 @@ export default function Home() {
           </div>
 
           <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {/* Free */}
             <div className="relative rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="absolute -top-3 left-6 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow">
                 EARLY ACCESS
@@ -325,18 +347,27 @@ export default function Home() {
                 </li>
               </ul>
 
-              <a
-                href="#planner"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-amber-300 bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600"
-              >
-                Start free (4 trips)
-              </a>
+              {currentPlan === "free" ? (
+                <button
+                  disabled
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                >
+                  Current plan
+                </button>
+              ) : (
+                <div className="mt-7">
+                  <ManageBillingButton />
+                </div>
+              )}
 
               <p className="mt-3 text-xs text-gray-500">
-                No credit card required.
+                {currentPlan === "free"
+                  ? "No credit card required."
+                  : "Use billing portal to cancel or downgrade."}
               </p>
             </div>
 
+            {/* Plus */}
             <div className="relative rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 px-3 py-1 text-xs font-semibold text-white shadow">
                 Most popular
@@ -387,18 +418,36 @@ export default function Home() {
                 Good for occasional and family trip planning
               </div>
 
-              <PricingButton
-                plan="plus"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black disabled:opacity-60"
-              >
-                Upgrade to Plus
-              </PricingButton>
+              {currentPlan === "plus" ? (
+                <button
+                  disabled
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                >
+                  Current plan
+                </button>
+              ) : currentPlan === "pro" ? (
+                <div className="mt-7">
+                  <ManageBillingButton />
+                </div>
+              ) : (
+                <PricingButton
+                  plan="plus"
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-black disabled:opacity-60"
+                >
+                  Upgrade to Plus
+                </PricingButton>
+              )}
 
               <p className="mt-3 text-xs text-gray-500">
-                Great for families planning multiple days.
+                {currentPlan === "plus"
+                  ? "You are currently on Plus."
+                  : currentPlan === "pro"
+                  ? "Use billing portal to change your subscription."
+                  : "Great for families planning multiple days."}
               </p>
             </div>
 
+            {/* Pro */}
             <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
@@ -450,15 +499,26 @@ export default function Home() {
 
               <p className="mt-4 text-xs text-gray-500">*Fair usage applies</p>
 
-              <PricingButton
-                plan="pro"
-                className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
-              >
-                Go Pro
-              </PricingButton>
+              {currentPlan === "pro" ? (
+                <button
+                  disabled
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                >
+                  Current plan
+                </button>
+              ) : (
+                <PricingButton
+                  plan="pro"
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Go Pro
+                </PricingButton>
+              )}
 
               <p className="mt-3 text-xs text-gray-500">
-                Best for frequent travellers and repeat planning.
+                {currentPlan === "pro"
+                  ? "You are currently on Pro."
+                  : "Best for frequent travellers and repeat planning."}
               </p>
             </div>
           </div>
