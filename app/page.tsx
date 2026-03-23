@@ -499,7 +499,7 @@ export default async function Home() {
 
               <p className="mt-4 text-xs text-gray-500">*Fair usage applies</p>
 
-         {currentPlan === "pro" ? (
+{currentPlan === "pro" ? (
   <button
     disabled
     className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
@@ -507,9 +507,12 @@ export default async function Home() {
     Current plan
   </button>
 ) : currentPlan === "plus" ? (
-  <ManageBillingButton className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
-    Manage billing
-  </ManageBillingButton>
+  <PricingButton
+    plan="pro"
+    className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
+  >
+    Upgrade to Pro
+  </PricingButton>
 ) : (
   <PricingButton
     plan="pro"
@@ -519,7 +522,7 @@ export default async function Home() {
   </PricingButton>
 )}
 
-           <p className="mt-3 text-xs text-gray-500">
+<p className="mt-3 text-xs text-gray-500">
   {currentPlan === "pro"
     ? "You are currently on Pro."
     : currentPlan === "plus"
