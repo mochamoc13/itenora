@@ -1,54 +1,40 @@
 "use client";
 
-import React from "react";
-
-type Props = {
+type PricingButtonProps = {
   plan: "plus" | "pro";
-  className?: string;
-  children: React.ReactNode;
+  label: string;
 };
 
-export default function PricingButton({ plan, className, children }: Props) {
-  const [loading, setLoading] = React.useState(false);
-
-  async function handleCheckout() {
+export default function PricingButton({ plan, label }: PricingButtonProps) {
+  async function handleClick() {
     try {
-      setLoading(true);
-
-      const priceId =
-        plan === "plus"
-          ? process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID
-          : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
-
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ plan }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to start checkout");
+      if (!res.ok || !data.url) {
+        throw new Error("Unable to start checkout");
       }
 
       window.location.href = data.url;
-    } catch (err: any) {
-      alert(err?.message || "Something went wrong");
-      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to start checkout.");
     }
   }
 
   return (
     <button
-      type="button"
-      onClick={handleCheckout}
-      disabled={loading}
-      className={className}
+      onClick={handleClick}
+      className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black"
     >
-      {loading ? "Loading..." : children}
+      {label}
     </button>
   );
 }

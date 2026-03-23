@@ -61,14 +61,21 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const plan = body?.plan === "pro" ? "pro" : "plus";
 
-    const priceId =
-      plan === "pro"
-        ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID;
+    const plusPrice = process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID;
+    const proPrice = process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+
+    const priceId = plan === "pro" ? proPrice : plusPrice;
 
     if (!priceId) {
       return NextResponse.json(
-        { error: `Missing Stripe price ID for ${plan}` },
+        {
+          error: `Missing Stripe price ID for ${plan}`,
+          debug: {
+            plan,
+            plusPrice,
+            proPrice,
+          },
+        },
         { status: 500 }
       );
     }
@@ -90,11 +97,22 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({
+      url: session.url,
+    });
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : "Failed to create checkout session";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: message,
+        debug: {
+          plusPrice: process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID,
+          proPrice: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+        },
+      },
+      { status: 500 }
+    );
   }
 }
