@@ -4,6 +4,7 @@ import PlannerCard from "@/components/PlannerCard";
 import PricingButton from "@/components/PricingButtons";
 import ManageBillingButton from "@/components/ManageBillingButton";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import HeroBadges from "@/components/HeroBadges";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -30,14 +31,14 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/70 px-3 py-1 text-xs font-medium text-gray-700">
+            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
               <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
               Early access is open
               <span className="text-gray-400">•</span>
               AI trip planning in minutes
             </div>
 
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
+            <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.02] tracking-tight text-gray-950 md:text-6xl">
               Plan your trip{" "}
               <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
                 with AI
@@ -45,47 +46,49 @@ export default async function Home() {
               , without the stress.
             </h1>
 
-            <p className="mt-5 max-w-xl text-lg text-gray-700">
-              Pick a destination, dates, budget, and who’s going. Itenora
-              generates a day-by-day plan with smart routes, food picks, and
-              cost-friendly options.
+            <p className="mt-5 max-w-xl text-lg leading-8 text-gray-700">
+              Tell Itenora where you’re going, when, your budget, and who’s
+              joining. Get a smart day-by-day itinerary with better routes, food
+              picks, and practical plans that actually fit your trip.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a
                 href="#planner"
-                className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-black"
+                className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-black"
               >
                 Start planning
               </a>
 
               <a
                 href="#how"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:-translate-y-0.5 hover:bg-gray-50"
               >
                 See how it works
               </a>
-
-              <span className="text-xs text-gray-500 sm:ml-1">
-                Free to start • No credit card
-              </span>
             </div>
 
-            <div className="mt-7 grid max-w-xl grid-cols-2 gap-3 text-sm text-gray-700 sm:grid-cols-3">
-              <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
-                <div className="font-semibold">Budget-aware</div>
+            <div className="mt-4">
+              <HeroBadges />
+            </div>
+
+            <div className="mt-7 grid max-w-xl grid-cols-1 gap-3 text-sm text-gray-700 sm:grid-cols-3">
+              <div className="rounded-2xl border border-gray-200 bg-white/80 px-4 py-4 shadow-sm">
+                <div className="font-semibold text-gray-900">Budget-aware</div>
                 <div className="mt-1 text-xs text-gray-500">
-                  Free → premium options
+                  Free to premium options
                 </div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
-                <div className="font-semibold">Family-ready</div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white/80 px-4 py-4 shadow-sm">
+                <div className="font-semibold text-gray-900">Family-ready</div>
                 <div className="mt-1 text-xs text-gray-500">
-                  Kid-friendly flow
+                  Kid-friendly pacing
                 </div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white/70 px-4 py-3">
-                <div className="font-semibold">Map-friendly</div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white/80 px-4 py-4 shadow-sm">
+                <div className="font-semibold text-gray-900">Map-friendly</div>
                 <div className="mt-1 text-xs text-gray-500">
                   Less backtracking
                 </div>
@@ -107,13 +110,13 @@ export default async function Home() {
                   </span>
                 </div>
 
-                <h3 className="mt-2 text-lg font-semibold">
+                <h3 className="mt-3 text-xl font-semibold text-gray-950">
                   Your trip, organised
                 </h3>
 
-                <p className="mt-2 text-sm text-gray-700">
-                  A clean day-by-day plan with smart routes, food picks, and
-                  budget-friendly options.
+                <p className="mt-2 text-sm leading-6 text-gray-700">
+                  A clean day-by-day plan with smart routes, food picks, budget
+                  guidance, and practical pacing for real trips.
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -133,12 +136,48 @@ export default async function Home() {
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600">
+                <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
                   Output: itinerary • costs • travel tips • edit & export
                 </div>
 
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          Day 1 — Arrival + easy highlights
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          Smart pacing after arrival, nearby food picks, and a
+                          low-stress first day.
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-medium text-purple-700">
+                        Balanced
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          Day 2 — Group nearby stops
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          Less zig-zagging, better routing, and more time to
+                          enjoy the trip.
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-orange-50 px-2 py-1 text-[11px] font-medium text-orange-700">
+                        Smart route
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                  <span>Built for solo & families</span>
+                  <span>Built for solo, couples & families</span>
                   <span className="font-medium text-gray-700">~60 seconds</span>
                 </div>
               </div>
@@ -157,16 +196,16 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">
+              <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
                 How it works
               </h2>
               <p className="mt-2 max-w-2xl text-gray-700">
-                A simple flow that turns your preferences into a day-by-day plan
-                you can actually follow.
+                A simple flow that turns your preferences into a day-by-day trip
+                plan you can actually follow.
               </p>
             </div>
             <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">60 seconds</span> to
+              <span className="font-medium text-gray-900">~60 seconds</span> to
               your first itinerary
             </div>
           </div>
@@ -176,17 +215,17 @@ export default async function Home() {
               {
                 step: "01",
                 title: "Tell us your trip",
-                desc: "Destination, dates, budget, who’s going, and interests.",
+                desc: "Destination, dates, budget, who’s going, and the kind of trip you want.",
               },
               {
                 step: "02",
-                title: "We generate a plan",
-                desc: "A logical route with smart stops, food picks, and cost-friendly options.",
+                title: "We generate a smarter plan",
+                desc: "A logical route with smart stops, food picks, and budget-friendly options.",
               },
               {
                 step: "03",
-                title: "Customise & export",
-                desc: "Tweak your pace, save trips, share with family, and export anytime.",
+                title: "Customise and keep going",
+                desc: "Adjust your pace, save trips, share with family, and export anytime.",
               },
             ].map((x) => (
               <div
@@ -200,7 +239,9 @@ export default async function Home() {
                   <span className="h-9 w-9 rounded-2xl bg-gradient-to-br from-purple-100 via-pink-100 to-orange-100 ring-1 ring-black/5" />
                 </div>
 
-                <div className="mt-4 text-lg font-semibold">{x.title}</div>
+                <div className="mt-4 text-lg font-semibold text-gray-950">
+                  {x.title}
+                </div>
                 <div className="mt-2 text-sm leading-relaxed text-gray-700">
                   {x.desc}
                 </div>
@@ -215,15 +256,17 @@ export default async function Home() {
       <section id="features" className="mx-auto max-w-6xl px-4 py-16">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Features</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+              Features
+            </h2>
             <p className="mt-2 max-w-2xl text-gray-700">
               Built for real trips — whether you’re solo, with friends, or
               travelling with the kids.
             </p>
           </div>
           <div className="text-sm text-gray-600">
-            Designed to be{" "}
-            <span className="font-medium text-gray-900">mobile-first</span>
+            Designed to feel{" "}
+            <span className="font-medium text-gray-900">simple and useful</span>
           </div>
         </div>
 
@@ -236,7 +279,7 @@ export default async function Home() {
             },
             {
               title: "Pace controls",
-              desc: "Relaxed, normal, or packed — itineraries that fit your energy.",
+              desc: "Relaxed, balanced, or packed — itineraries that fit your energy.",
               tint: "from-orange-100 via-pink-100 to-purple-100",
             },
             {
@@ -246,7 +289,7 @@ export default async function Home() {
             },
             {
               title: "Family-ready planning",
-              desc: "Kid-friendly ideas and a sensible daily flow, so everyone enjoys the trip.",
+              desc: "Kid-friendly ideas and a sensible daily flow so everyone enjoys the trip.",
               tint: "from-purple-100 via-orange-100 to-pink-100",
             },
           ].map((x) => (
@@ -259,7 +302,9 @@ export default async function Home() {
                   className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${x.tint} ring-1 ring-black/5`}
                 />
                 <div>
-                  <div className="text-lg font-semibold">{x.title}</div>
+                  <div className="text-lg font-semibold text-gray-950">
+                    {x.title}
+                  </div>
                   <div className="mt-2 text-sm leading-relaxed text-gray-700">
                     {x.desc}
                   </div>
@@ -276,7 +321,9 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+                Pricing
+              </h2>
               <p className="mt-2 max-w-2xl text-gray-700">
                 Start free. Upgrade when you’re planning more trips or want
                 exports and advanced preferences.
@@ -284,8 +331,8 @@ export default async function Home() {
             </div>
 
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              Try risk-free • Cancel anytime • No lock-in
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
+              Start free • Cancel anytime • No lock-in
             </div>
           </div>
 
@@ -350,7 +397,7 @@ export default async function Home() {
               {currentPlan === "free" ? (
                 <button
                   disabled
-                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                  className="mt-7 inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500"
                 >
                   Current plan
                 </button>
@@ -423,7 +470,7 @@ export default async function Home() {
               {currentPlan === "plus" ? (
                 <button
                   disabled
-                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                  className="mt-7 inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500"
                 >
                   Current plan
                 </button>
@@ -506,7 +553,7 @@ export default async function Home() {
               {currentPlan === "pro" ? (
                 <button
                   disabled
-                  className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed"
+                  className="mt-7 inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-500"
                 >
                   Current plan
                 </button>
@@ -549,7 +596,7 @@ export default async function Home() {
 
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div className="rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm md:p-12">
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
             Start planning your next trip today
           </h2>
           <p className="mt-3 text-gray-700">
