@@ -612,22 +612,23 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer id="contact" className="border-t border-gray-200 bg-gray-50">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm font-semibold">Itenora</div>
-              <div className="mt-1 text-sm text-gray-700">
-                Questions? Email:{" "}
-                <span className="font-medium">support@itenora.com</span>
-              </div>
-            </div>
-            <div className="text-xs text-gray-500">
-              © {new Date().getFullYear()} Itenora. All rights reserved.
-            </div>
-          </div>
-        </div>
-      </footer>
+<footer className="border-t border-black/5 bg-white">
+  <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 text-sm text-gray-600">
+    <div>
+      Need help?{" "}
+      <a
+        href="mailto:support@itenora.com"
+        className="font-medium text-gray-900 underline hover:no-underline"
+      >
+        support@itenora.com
+      </a>
+    </div>
+
+    <div className="text-xs text-gray-500">
+      © 2026 Itenora. All rights reserved.
+    </div>
+  </div>
+</footer>
     </div>
   );
 }
