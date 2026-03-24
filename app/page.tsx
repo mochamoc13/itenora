@@ -619,7 +619,7 @@ export default async function Home() {
               <div className="text-sm font-semibold">Itenora</div>
               <div className="mt-1 text-sm text-gray-700">
                 Questions? Email:{" "}
-                <span className="font-medium">hello@itenora.com</span>
+                <span className="font-medium">support@itenora.com</span>
               </div>
             </div>
             <div className="text-xs text-gray-500">
