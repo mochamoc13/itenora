@@ -282,14 +282,17 @@ React.useEffect(() => {
 
             <div className="md:col-span-3">
               <label className="text-xs font-semibold text-gray-700">Days</label>
-              <input
-                type="number"
-                min={1}
-                max={14}
-                value={days}
-                onChange={(e) => setDays(parseInt(e.target.value || "3", 10))}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
-              />
+           <select
+  value={days}
+  onChange={(e) => setDays(Number(e.target.value))}
+  className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+>
+  {[...Array(14)].map((_, i) => (
+    <option key={i + 1} value={i + 1}>
+      {i + 1} day{i + 1 > 1 ? "s" : ""}
+    </option>
+  ))}
+</select>
               <p className="mt-1 text-[11px] text-gray-500">Max 14 days.</p>
             </div>
 
