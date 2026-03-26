@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import UsageSummary from "@/components/UsageSummary";
+import ShareTripButton from "@/components/ShareTripButton";
 
 export default async function ItineraryPage() {
   const { userId } = await auth();
@@ -35,25 +36,25 @@ export default async function ItineraryPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-   <div className="mb-8 flex items-start justify-between gap-4">
-  <div className="flex-1">
-    <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
-    <p className="mt-2 text-gray-600">
-      Your saved itineraries, ready to open anytime.
-    </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
+          <p className="mt-2 text-gray-600">
+            Your saved itineraries, ready to open anytime.
+          </p>
 
-    <div className="mt-4 max-w-md">
-      <UsageSummary />
-    </div>
-  </div>
+          <div className="mt-4 max-w-md">
+            <UsageSummary />
+          </div>
+        </div>
 
-  <Link
-    href="/#planner"
-    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-  >
-    New Trip
-  </Link>
-</div>
+        <Link
+          href="/#planner"
+          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          New Trip
+        </Link>
+      </div>
 
       {!trips || trips.length === 0 ? (
         <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-sm">
@@ -73,6 +74,7 @@ export default async function ItineraryPage() {
         <div className="grid gap-4">
           {trips.map((trip: any) => {
             const input = trip.generated_plan?.input ?? {};
+
             const days =
               typeof input.days === "number"
                 ? input.days
@@ -93,7 +95,7 @@ export default async function ItineraryPage() {
                 className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
                       {trip.title || "Untitled Trip"}
                     </h2>
@@ -123,9 +125,13 @@ export default async function ItineraryPage() {
                     </div>
                   </div>
 
-                  <div className="text-sm text-gray-500 sm:text-right">
-                    <p>Created</p>
-                    <p className="font-medium text-gray-700">{createdAt}</p>
+                  <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+                    <div className="text-sm text-gray-500 sm:text-right">
+                      <p>Created</p>
+                      <p className="font-medium text-gray-700">{createdAt}</p>
+                    </div>
+
+                    <ShareTripButton tripId={trip.id} />
                   </div>
                 </div>
               </Link>
