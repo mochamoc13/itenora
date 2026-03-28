@@ -16,7 +16,7 @@ export default function AccountBillingArea() {
         const data = await res.json();
 
         if (!cancelled) {
-          setPlan(data.plan || "free");
+          setPlan(data?.plan || "free");
         }
       } catch {
         if (!cancelled) {
@@ -34,7 +34,7 @@ export default function AccountBillingArea() {
 
   return (
     <div className="flex items-center gap-3">
-      {plan !== "free" && <ManageBillingButton />}
+      {plan !== "free" ? <ManageBillingButton /> : null}
       <PlanBadge />
     </div>
   );
