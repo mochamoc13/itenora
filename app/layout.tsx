@@ -2,6 +2,7 @@ import "./globals.css";
 import Link from "next/link";
 import AccountBillingArea from "@/components/AccountBillingArea";
 import ManageBillingButton from "@/components/ManageBillingButton";
+import UsageSummary from "@/components/UsageSummary";
 import {
   ClerkProvider,
   SignedIn,
@@ -25,7 +26,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className="bg-white text-gray-900">
-          <header className="fixed inset-x-0 top-0 z-50 border-b border-black/10 bg-white/90 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
+          <header className="fixed inset-x-0 top-0 z-50 border-b border-black/10 bg-white/95 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/80">
             <div className="mx-auto max-w-6xl px-4">
               <div className="flex items-center justify-between py-4">
                 <Link href="/" className="group flex items-center gap-3">
@@ -73,30 +74,41 @@ export default function RootLayout({
                   </SignedOut>
 
                   <SignedIn>
+                    <div className="hidden max-w-[260px] md:block">
+                      <UsageSummary />
+                    </div>
+
                     <div className="hidden md:block">
                       <ManageBillingButton />
                     </div>
+
                     <UserButton afterSignOutUrl="/" />
                   </SignedIn>
                 </div>
               </div>
 
               <SignedIn>
-                <div className="flex gap-2 overflow-x-auto border-t border-black/5 py-3 md:hidden">
-                  <Link
-                    href="/itinerary"
-                    className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                  >
-                    My Trips
-                  </Link>
+                <div className="space-y-3 border-t border-black/5 py-3 md:hidden">
+                  <div className="max-w-full overflow-hidden">
+                    <UsageSummary />
+                  </div>
 
-                  <ManageBillingButton className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50" />
+                  <div className="flex gap-2 overflow-x-auto">
+                    <Link
+                      href="/itinerary"
+                      className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    >
+                      My Trips
+                    </Link>
+
+                    <ManageBillingButton className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50" />
+                  </div>
                 </div>
               </SignedIn>
             </div>
           </header>
 
-          <main className="pt-32 md:pt-20">{children}</main>
+          <main className="pt-44 md:pt-24">{children}</main>
 
           <AccountBillingArea />
         </body>
