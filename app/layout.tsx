@@ -18,7 +18,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <head>
-          <meta name="agd-partner-manual-verification" content="itenora" />
+          <meta name="agd-partner-manual-verification" />
         </head>
         <body className="bg-white text-gray-900">
           <header className="fixed inset-x-0 top-0 z-50 border-b border-black/10 bg-white/90 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
