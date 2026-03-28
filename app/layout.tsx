@@ -37,7 +37,7 @@ export default function RootLayout({
                 </div>
 
                 <span className="text-base font-semibold tracking-tight text-gray-900">
-                  Itenora
+                  test 123
                 </span>
               </Link>
 
