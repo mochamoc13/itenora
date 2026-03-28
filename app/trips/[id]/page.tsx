@@ -20,30 +20,28 @@ function isValidDateString(value?: string | null) {
   return !Number.isNaN(d.getTime());
 }
 
-function normalizeText(value: unknown) {
+function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getMeaningfulStayArea(day: any, destination: string) {
-  if (!Array.isArray(day?.stops)) return "";
+function getMeaningfulStayArea(stops: any[], destination: string) {
+  if (!Array.isArray(stops)) return "";
 
-  const rawDestination = normalizeText(destination).toLowerCase();
+  const destinationLower = cleanText(destination).toLowerCase();
 
-  for (const stop of day.stops) {
-    const area = normalizeText(stop?.area);
+  for (const stop of stops) {
+    const area = cleanText(stop?.area);
     if (!area) continue;
 
     const areaLower = area.toLowerCase();
 
-    // Skip if area is basically same as destination
-    if (rawDestination && areaLower === rawDestination) continue;
+    if (destinationLower && areaLower === destinationLower) continue;
 
-    // Skip obviously vague values
     if (
       areaLower === "city center" ||
+      areaLower === "city centre" ||
       areaLower === "downtown" ||
-      areaLower === "central" ||
-      areaLower === "city centre"
+      areaLower === "central"
     ) {
       continue;
     }
@@ -79,7 +77,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
     : [];
 
   const input = trip.generated_plan?.input ?? {};
-  const destination = normalizeText(trip.destination) || "No destination";
   const hasValidStartDate = isValidDateString(input.startDate);
 
   const editParams = new URLSearchParams();
@@ -93,12 +90,12 @@ export default async function TripDetailPage({ params }: TripPageProps) {
   if (input.departTime) editParams.set("departTime", input.departTime);
   if (input.childAges) editParams.set("childAges", input.childAges);
   if (input.pace) editParams.set("pace", input.pace);
-
   if (Array.isArray(input.interests) && input.interests.length > 0) {
     editParams.set("interests", input.interests.join(","));
   }
 
   const editHref = `/?${editParams.toString()}#planner`;
+  const tripDestination = cleanText(trip.destination);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -139,7 +136,9 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                 {trip.title || "Untitled Trip"}
               </h1>
 
-              <p className="mt-2 text-base text-gray-600">{destination}</p>
+              <p className="mt-2 text-base text-gray-600">
+                {trip.destination || "No destination"}
+              </p>
 
               <p className="mt-3 text-sm text-gray-500">
                 Planned in seconds with Itenora. Save it, share it, and travel
@@ -208,10 +207,11 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
         <div className="space-y-8">
           {itinerary.map((day: any, dayIndex: number) => {
-            const meaningfulArea = getMeaningfulStayArea(day, destination);
-            const showHotelBox = Boolean(meaningfulArea || normalizeText(trip.destination));
+            const dayStops = Array.isArray(day.stops) ? day.stops : [];
+            const meaningfulArea = getMeaningfulStayArea(dayStops, tripDestination);
+            const displayArea = meaningfulArea || tripDestination;
 
-            const displayArea = meaningfulArea || normalizeText(trip.destination);
+            const showHotelBox = Boolean(tripDestination);
 
             const checkIn =
               hasValidStartDate && input.startDate
@@ -224,7 +224,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                 : undefined;
 
             const hotelLink = buildHotelAffiliateLink({
-              destination: normalizeText(trip.destination),
+              destination: tripDestination,
               area: meaningfulArea || undefined,
               checkIn,
               checkOut,
@@ -268,8 +268,8 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                       ) : (
                         <>
                           View hotel options in{" "}
-                          <span className="font-semibold">{displayArea}</span> for
-                          this trip.
+                          <span className="font-semibold">{tripDestination}</span>
+                          .
                         </>
                       )}
                     </p>
@@ -282,60 +282,59 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                     >
                       {meaningfulArea
                         ? `Find hotels in ${displayArea}`
-                        : `Find hotels in ${normalizeText(trip.destination)}`}
+                        : `Find hotels in ${tripDestination}`}
                     </a>
                   </div>
                 ) : null}
 
                 <div className="space-y-4">
-                  {Array.isArray(day.stops) &&
-                    day.stops.map((stop: any, index: number) => (
-                      <div
-                        key={index}
-                        className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-gray-500">
-                              {stop.time || "Anytime"}
-                              {stop.area ? ` • ${stop.area}` : ""}
-                            </div>
-
-                            <h3 className="mt-1 text-lg font-semibold text-gray-900">
-                              {stop.title || "Stop"}
-                            </h3>
-
-                            {stop.notes ? (
-                              <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                                {stop.notes}
-                              </p>
-                            ) : null}
+                  {dayStops.map((stop: any, index: number) => (
+                    <div
+                      key={index}
+                      className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-500">
+                            {stop.time || "Anytime"}
+                            {stop.area ? ` • ${stop.area}` : ""}
                           </div>
 
-                          <div className="text-sm text-gray-500">
-                            ~{stop.costEstimate ?? 0}
-                          </div>
+                          <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                            {stop.title || "Stop"}
+                          </h3>
+
+                          {stop.notes ? (
+                            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                              {stop.notes}
+                            </p>
+                          ) : null}
                         </div>
 
-                        <div className="mt-3">
-                          <a
-                            href={`https://maps.google.com/?q=${encodeURIComponent(
-                              stop.mapQuery ||
-                                `${stop.title || "Stop"}, ${normalizeText(trip.destination)}`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-medium text-blue-600 hover:underline"
-                          >
-                            Open on Google Maps
-                          </a>
-
-                          <p className="mt-1 text-xs text-gray-500">
-                            Opens in a new tab so you can keep this itinerary open.
-                          </p>
+                        <div className="text-sm text-gray-500">
+                          ~{stop.costEstimate ?? 0}
                         </div>
                       </div>
-                    ))}
+
+                      <div className="mt-3">
+                        <a
+                          href={`https://maps.google.com/?q=${encodeURIComponent(
+                            stop.mapQuery ||
+                              `${stop.title || "Stop"}, ${trip.destination || ""}`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          Open on Google Maps
+                        </a>
+
+                        <p className="mt-1 text-xs text-gray-500">
+                          Opens in a new tab so you can keep this itinerary open.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
             );
