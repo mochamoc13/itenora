@@ -1,14 +1,28 @@
-export function buildAgodaLink(params: {
-  destination: string;
+export function addDays(dateString: string, days: number) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return undefined;
+
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function buildHotelAffiliateLink(params: {
+  destination?: string;
+  area?: string;
   checkIn?: string;
   checkOut?: string;
 }) {
-  const { destination, checkIn, checkOut } = params;
+  const { destination, area, checkIn, checkOut } = params;
 
-  const base = "https://www.agoda.com/search";
-  const url = new URL(base);
+  const url = new URL("https://www.agoda.com/search");
 
-  url.searchParams.set("city", destination);
+  const cityQuery = [area, destination].filter(Boolean).join(", ");
+
+  if (cityQuery) {
+    url.searchParams.set("city", cityQuery);
+  } else if (destination) {
+    url.searchParams.set("city", destination);
+  }
 
   if (checkIn) {
     url.searchParams.set("checkIn", checkIn);
@@ -19,17 +33,4 @@ export function buildAgodaLink(params: {
   }
 
   return url.toString();
-}
-
-export function getSuggestedStayArea(destination: string) {
-  const d = destination.toLowerCase();
-
-  if (d.includes("tokyo")) return "Shinjuku or Ueno";
-  if (d.includes("osaka")) return "Namba";
-  if (d.includes("kyoto")) return "Gion or Kyoto Station";
-  if (d.includes("singapore")) return "Orchard, Bugis, or Marina Bay";
-  if (d.includes("sydney")) return "CBD or Darling Harbour";
-  if (d.includes("melbourne")) return "CBD or Southbank";
-
-  return `central ${destination}`;
 }
