@@ -82,15 +82,15 @@ export default function RootLayout({
               </div>
 
               <SignedIn>
-                <div className="flex items-center gap-2 border-t border-black/5 py-3 md:hidden">
+                <div className="flex gap-2 overflow-x-auto border-t border-black/5 py-3 md:hidden">
                   <Link
                     href="/itinerary"
-                    className="inline-flex items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                   >
                     My Trips
                   </Link>
 
-                  <ManageBillingButton />
+                  <ManageBillingButton className="inline-flex shrink-0 items-center justify-center rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50" />
                 </div>
               </SignedIn>
             </div>
