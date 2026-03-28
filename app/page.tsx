@@ -633,10 +633,16 @@ export default async function Home() {
   );
 }
 
+
 function PlannerCardFallback() {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
-      <div className="text-sm text-gray-500">Loading planner...</div>
+      <div className="space-y-3">
+        <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-gray-100" />
+        <div className="h-10 w-full animate-pulse rounded-xl bg-gray-100" />
+        <div className="h-10 w-36 animate-pulse rounded-xl bg-gray-200" />
+      </div>
     </div>
   );
 }

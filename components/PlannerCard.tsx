@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import GeneratingLoader from "@/components/GeneratingLoader";
 
 const PEOPLE_MAP: Record<string, "solo" | "couple" | "family"> = {
   Solo: "solo",
@@ -102,39 +103,37 @@ export default function PlannerCard() {
 
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [usage, setUsage] = React.useState<{
-  plan: string;
-  used: number;
-  limit: number | "unlimited";
-} | null>(null);
+  const [usage, setUsage] = React.useState<UsageInfo | null>(null);
 
-React.useEffect(() => {
-  let cancelled = false;
+  React.useEffect(() => {
+    let cancelled = false;
 
-  async function loadUsage() {
-    try {
-      const res = await fetch("/api/user/usage", {
-        cache: "no-store",
-      });
+    async function loadUsage() {
+      try {
+        const res = await fetch("/api/user/usage", {
+          cache: "no-store",
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (!cancelled && res.ok) {
-        setUsage(data);
+        if (!cancelled && res.ok) {
+          setUsage(data);
+        }
+      } catch {
+        console.error("Failed to load usage");
       }
-    } catch (err) {
-      console.error("Failed to load usage");
     }
-  }
 
-  loadUsage();
+    loadUsage();
 
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleInterest = (t: string) => {
+    if (loading) return;
+
     setSelected((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
@@ -153,6 +152,8 @@ React.useEffect(() => {
   });
 
   async function handleGenerate() {
+    if (loading) return;
+
     try {
       setLoading(true);
       setError("");
@@ -211,6 +212,8 @@ React.useEffect(() => {
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
+      {loading && <GeneratingLoader destination={destination.trim() || "your trip"} />}
+
       <div className="pointer-events-none absolute -inset-10 -z-10 rounded-[2rem] bg-gradient-to-br from-purple-200/40 via-pink-200/25 to-orange-200/30 blur-2xl" />
 
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -232,7 +235,9 @@ React.useEffect(() => {
         <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 text-sm">
           <div className="font-semibold capitalize">{usage.plan} plan</div>
           {usage.limit === "unlimited" ? (
-            <div className="mt-1 text-green-600">Unlimited itinerary generation</div>
+            <div className="mt-1 text-green-600">
+              Unlimited itinerary generation
+            </div>
           ) : (
             <div className="mt-1 text-gray-600">
               {usage.used} / {usage.limit} itineraries used this month
@@ -258,7 +263,8 @@ React.useEffect(() => {
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
                 placeholder="Tokyo, Singapore, Bali..."
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               />
             </div>
 
@@ -271,7 +277,8 @@ React.useEffect(() => {
                     e.target.value as "Solo" | "Couple" | "Friends" | "Family"
                   )
                 }
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               >
                 <option>Solo</option>
                 <option>Couple</option>
@@ -282,17 +289,18 @@ React.useEffect(() => {
 
             <div className="md:col-span-3">
               <label className="text-xs font-semibold text-gray-700">Days</label>
-           <select
-  value={days}
-  onChange={(e) => setDays(Number(e.target.value))}
-  className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
->
-  {[...Array(14)].map((_, i) => (
-    <option key={i + 1} value={i + 1}>
-      {i + 1} day{i + 1 > 1 ? "s" : ""}
-    </option>
-  ))}
-</select>
+              <select
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
+              >
+                {[...Array(14)].map((_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1} day{i + 1 > 1 ? "s" : ""}
+                  </option>
+                ))}
+              </select>
               <p className="mt-1 text-[11px] text-gray-500">Max 14 days.</p>
             </div>
 
@@ -307,7 +315,8 @@ React.useEffect(() => {
                     e.target.value as "Budget" | "Mid" | "Comfort" | "Luxury"
                   )
                 }
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               >
                 <option>Budget</option>
                 <option>Mid</option>
@@ -324,7 +333,8 @@ React.useEffect(() => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               />
             </div>
 
@@ -336,7 +346,8 @@ React.useEffect(() => {
                 type="time"
                 value={arrivalTime}
                 onChange={(e) => setArrivalTime(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               />
               <p className="mt-1 text-[11px] text-gray-500">
                 If set, Day 1 starts after arrival.
@@ -351,7 +362,8 @@ React.useEffect(() => {
                 type="time"
                 value={departTime}
                 onChange={(e) => setDepartTime(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               />
               <p className="mt-1 text-[11px] text-gray-500">
                 If set, last day ends earlier.
@@ -374,7 +386,8 @@ React.useEffect(() => {
                       | "teens"
                   )
                 }
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900"
+                disabled={loading}
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
               >
                 <option value="none">No kids / not specified</option>
                 <option value="baby">Baby (0–1)</option>
@@ -392,7 +405,8 @@ React.useEffect(() => {
                 <button
                   type="button"
                   onClick={() => setSelected(["Food", "Nature"])}
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900"
+                  disabled={loading}
+                  className="text-xs font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Use simple
                 </button>
@@ -406,8 +420,9 @@ React.useEffect(() => {
                       key={t}
                       type="button"
                       onClick={() => toggleInterest(t)}
+                      disabled={loading}
                       className={[
-                        "rounded-full border px-3 py-2 text-xs font-medium transition",
+                        "rounded-full border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
                         on
                           ? "border-transparent bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white shadow-sm"
                           : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
@@ -446,43 +461,50 @@ React.useEffect(() => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-lg bg-black px-6 py-3 text-white disabled:opacity-60"
+                  className="rounded-lg bg-black px-6 py-3 text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? "Generating..." : "Generate my itinerary"}
                 </button>
               </SignedIn>
 
-            {error && (
-  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
-    <p className="text-sm text-red-700 font-medium">{error}</p>
+              {loading && (
+                <p className="mt-3 text-sm text-gray-500">
+                  Building your itinerary now. This usually takes 10–20 seconds.
+                </p>
+              )}
 
-    {error.toLowerCase().includes("limit") && (
-      <div className="mt-3 flex gap-2">
-        <a
-          href="#pricing"
-          className="rounded-lg bg-black px-4 py-2 text-sm text-white"
-        >
-          Upgrade plan
-        </a>
+              {error && (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-medium text-red-700">{error}</p>
 
-        <button
-          onClick={() => setError("")}
-          className="rounded-lg border px-4 py-2 text-sm"
-        >
-          Dismiss
-        </button>
-      </div>
-    )}
-  </div>
-)}
+                  {error.toLowerCase().includes("limit") && (
+                    <div className="mt-3 flex gap-2">
+                      <a
+                        href="#pricing"
+                        className="rounded-lg bg-black px-4 py-2 text-sm text-white"
+                      >
+                        Upgrade plan
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => setError("")}
+                        className="rounded-lg border px-4 py-2 text-sm"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {usage && (
-  <p className="mt-2 text-xs text-gray-500">
-    {usage.plan === "pro"
-      ? `${usage.used} itineraries generated (unlimited)`
-      : `${usage.used} / ${usage.limit} itineraries used this month`}
-  </p>
-)}
+                <p className="mt-2 text-xs text-gray-500">
+                  {usage.plan === "pro"
+                    ? `${usage.used} itineraries generated (unlimited)`
+                    : `${usage.used} / ${usage.limit} itineraries used this month`}
+                </p>
+              )}
             </div>
           </div>
         </form>
