@@ -25,11 +25,8 @@ export default function PlanBadge() {
 
     loadPlan();
 
-    const interval = setInterval(loadPlan, 3000);
-
     return () => {
       cancelled = true;
-      clearInterval(interval);
     };
   }, []);
 
@@ -37,8 +34,8 @@ export default function PlanBadge() {
     plan === "pro"
       ? "bg-purple-100 text-purple-700"
       : plan === "plus"
-      ? "bg-blue-100 text-blue-700"
-      : "bg-gray-100 text-gray-600";
+        ? "bg-blue-100 text-blue-700"
+        : "bg-gray-100 text-gray-600";
 
   return (
     <div className={`rounded-full px-3 py-1 text-xs font-semibold ${styles}`}>
