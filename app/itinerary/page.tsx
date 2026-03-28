@@ -5,6 +5,37 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import UsageSummary from "@/components/UsageSummary";
 import ShareTripButton from "@/components/ShareTripButton";
 
+function addDays(dateString: string, days: number) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return undefined;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function buildAgodaLink(params: {
+  destination?: string;
+  checkIn?: string;
+  checkOut?: string;
+}) {
+  const { destination, checkIn, checkOut } = params;
+
+  const url = new URL("https://www.agoda.com/search");
+
+  if (destination) {
+    url.searchParams.set("city", destination);
+  }
+
+  if (checkIn) {
+    url.searchParams.set("checkIn", checkIn);
+  }
+
+  if (checkOut) {
+    url.searchParams.set("checkOut", checkOut);
+  }
+
+  return url.toString();
+}
+
 export default async function ItineraryPage() {
   const { userId } = await auth();
 
@@ -36,7 +67,7 @@ export default async function ItineraryPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">My Trips</h1>
           <p className="mt-2 text-gray-600">
@@ -50,7 +81,7 @@ export default async function ItineraryPage() {
 
         <Link
           href="/#planner"
-          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           New Trip
         </Link>
@@ -79,8 +110,8 @@ export default async function ItineraryPage() {
               typeof input.days === "number"
                 ? input.days
                 : Array.isArray(trip.generated_plan?.itinerary)
-                ? trip.generated_plan.itinerary.length
-                : null;
+                  ? trip.generated_plan.itinerary.length
+                  : null;
 
             const people = input.people ?? null;
             const budget = input.budget ?? trip.budget ?? null;
@@ -88,10 +119,22 @@ export default async function ItineraryPage() {
               ? new Date(trip.created_at).toLocaleDateString()
               : "";
 
+            const startDate =
+              trip.start_date ?? input.startDate ?? undefined;
+
+            const endDate =
+              trip.end_date ??
+              (startDate && days ? addDays(startDate, Math.max(days - 1, 0)) : undefined);
+
+            const hotelLink = buildAgodaLink({
+              destination: trip.destination || input.destination,
+              checkIn: startDate,
+              checkOut: endDate,
+            });
+
             return (
-              <Link
+              <div
                 key={trip.id}
-                href={`/trips/${trip.id}`}
                 className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -122,6 +165,30 @@ export default async function ItineraryPage() {
                           {budget}
                         </span>
                       ) : null}
+
+                      {startDate ? (
+                        <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700">
+                          Hotel-ready
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href={`/trips/${trip.id}`}
+                        className="inline-flex rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        Open trip
+                      </Link>
+
+                      <a
+                        href={hotelLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
+                      >
+                        Check hotels
+                      </a>
                     </div>
                   </div>
 
@@ -134,7 +201,7 @@ export default async function ItineraryPage() {
                     <ShareTripButton tripId={trip.id} />
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

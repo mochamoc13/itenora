@@ -60,6 +60,47 @@ function gmLink(query: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+function addDays(dateString: string, days: number) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return undefined;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function buildAgodaLink(params: {
+  destination: string;
+  checkIn?: string;
+  checkOut?: string;
+}) {
+  const url = new URL("https://www.agoda.com/search");
+  url.searchParams.set("city", params.destination);
+
+  if (params.checkIn) {
+    url.searchParams.set("checkIn", params.checkIn);
+  }
+
+  if (params.checkOut) {
+    url.searchParams.set("checkOut", params.checkOut);
+  }
+
+  return url.toString();
+}
+
+function getSuggestedStayArea(destination: string) {
+  const d = destination.toLowerCase();
+
+  if (d.includes("tokyo")) return "Shinjuku or Ueno";
+  if (d.includes("osaka")) return "Namba";
+  if (d.includes("kyoto")) return "Kyoto Station or Gion";
+  if (d.includes("singapore")) return "Orchard, Bugis, or Marina Bay";
+  if (d.includes("sydney")) return "CBD or Darling Harbour";
+  if (d.includes("melbourne")) return "CBD or Southbank";
+  if (d.includes("seoul")) return "Myeongdong or Hongdae";
+  if (d.includes("bangkok")) return "Sukhumvit or Siam";
+
+  return `central ${destination}`;
+}
+
 export default function ItineraryClient() {
   const sp = useSearchParams();
 
@@ -173,6 +214,14 @@ export default function ItineraryClient() {
   }
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
+  const suggestedArea = getSuggestedStayArea(data.input.destination);
+  const hotelLink = buildAgodaLink({
+    destination: data.input.destination,
+    checkIn: data.input.startDate,
+    checkOut: data.input.startDate
+      ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
+      : undefined,
+  });
 
   return (
     <div className="mx-auto max-w-5xl p-6">
@@ -195,7 +244,16 @@ export default function ItineraryClient() {
           ) : null}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={hotelLink}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition hover:bg-orange-100"
+          >
+            Check hotels
+          </a>
+
           {data.savedTrip?.slug ? (
             <button
               className="rounded-xl border px-4 py-2 transition hover:bg-neutral-50 active:scale-95 disabled:opacity-60"
@@ -208,9 +266,39 @@ export default function ItineraryClient() {
         </div>
       </div>
 
+      <div className="mt-6 rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">
+              Stay recommendation
+            </p>
+
+            <h2 className="mt-1 text-xl font-bold text-gray-900">
+              Best area to stay in {data.input.destination}
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-700">
+              For this trip, a practical base would be{" "}
+              <span className="font-semibold">{suggestedArea}</span>. This usually
+              keeps transport easier and makes the day-by-day itinerary smoother.
+            </p>
+          </div>
+
+          <a
+            href={hotelLink}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            className="inline-flex items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            Check price on Agoda
+          </a>
+        </div>
+      </div>
+
       {data.savedTrip ? (
         <div className="mt-6 rounded-2xl border p-4 text-sm text-neutral-600">
-          Trip saved successfully: <span className="font-medium">{data.savedTrip.title}</span>
+          Trip saved successfully:{" "}
+          <span className="font-medium">{data.savedTrip.title}</span>
         </div>
       ) : null}
 
@@ -247,7 +335,7 @@ export default function ItineraryClient() {
                     </div>
                   ) : null}
 
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-4">
                     <a
                       className="text-sm underline"
                       href={gmLink(s.mapQuery)}
@@ -256,6 +344,17 @@ export default function ItineraryClient() {
                     >
                       Open on Google Maps
                     </a>
+
+                    {idx === 0 ? (
+                      <a
+                        className="text-sm font-medium text-orange-700 underline"
+                        href={hotelLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                      >
+                        Check nearby hotels
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               ))}
