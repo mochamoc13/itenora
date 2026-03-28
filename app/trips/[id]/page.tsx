@@ -61,7 +61,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
         id="itinerary-image"
         className="relative overflow-hidden rounded-[28px] border border-black/10 bg-white p-5 shadow-sm sm:p-8"
       >
-        {/* top badge */}
         <div className="absolute right-4 top-4 z-10">
           <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur">
             <Image
@@ -77,7 +76,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
           </div>
         </div>
 
-        {/* social header */}
         <div className="mb-8 rounded-3xl border border-black/10 bg-gradient-to-br from-purple-50 via-white to-orange-50 p-5 sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-3xl pr-0 sm:pr-28">
@@ -155,7 +153,16 @@ export default async function TripDetailPage({ params }: TripPageProps) {
           </div>
         </div>
 
-        {/* itinerary */}
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-medium text-amber-900">
+            Tip: Save or share this trip before opening Google Maps, especially
+            if you came from Instagram or Facebook.
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            Google Maps opens in a new tab, so your itinerary stays here.
+          </p>
+        </div>
+
         <div className="space-y-8">
           {itinerary.map((day: any, dayIndex: number) => (
             <section
@@ -216,11 +223,15 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                               `${stop.title || "Stop"}, ${trip.destination || ""}`
                           )}`}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="text-sm font-medium text-blue-600 hover:underline"
                         >
                           Open on Google Maps
                         </a>
+
+                        <p className="mt-1 text-xs text-gray-500">
+                          Opens in a new tab so you can keep this itinerary open.
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -229,7 +240,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
           ))}
         </div>
 
-        {/* bottom branding */}
         <div className="mt-10 rounded-2xl border border-black/10 bg-gray-50 px-4 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
