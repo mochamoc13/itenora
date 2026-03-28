@@ -6,7 +6,12 @@ import { redirect, notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ShareTripButton from "@/components/ShareTripButton";
 import DownloadImageButton from "@/components/DownloadImageButton";
-import { buildHotelAffiliateLink, addDays } from "@/lib/affiliate";
+import {
+  buildHotelAffiliateLink,
+  buildKlookActivityLink,
+  isBookableActivity,
+  addDays,
+} from "@/lib/affiliate";
 
 type TripPageProps = {
   params: {
@@ -316,23 +321,34 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                         </div>
                       </div>
 
-                      <div className="mt-3">
-                        <a
-                          href={`https://maps.google.com/?q=${encodeURIComponent(
-                            stop.mapQuery ||
-                              `${stop.title || "Stop"}, ${trip.destination || ""}`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 hover:underline"
-                        >
-                          Open on Google Maps
-                        </a>
+                <div className="mt-3 flex flex-wrap gap-4 items-center">
+  <a
+    href={`https://maps.google.com/?q=${encodeURIComponent(
+      stop.mapQuery ||
+        `${stop.title || "Stop"}, ${trip.destination || ""}`
+    )}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-sm font-medium text-blue-600 hover:underline"
+  >
+    Open on Google Maps
+  </a>
 
-                        <p className="mt-1 text-xs text-gray-500">
-                          Opens in a new tab so you can keep this itinerary open.
-                        </p>
-                      </div>
+  {isBookableActivity(stop.title) && (
+    <a
+      href={buildKlookActivityLink(stop.title, trip.destination)}
+      target="_blank"
+      rel="noopener noreferrer sponsored"
+     className="inline-flex items-center rounded-lg bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"s
+    >
+      Check price on Klook → skip queues
+    </a>
+  )}
+
+  <span className="w-full text-xs text-gray-500">
+    Opens in a new tab so you can keep this itinerary open.
+  </span>
+</div>
                     </div>
                   ))}
                 </div>
