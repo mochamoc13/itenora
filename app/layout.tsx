@@ -49,6 +49,15 @@ export default function RootLayout({
                 <a href="/#contact" className="transition hover:text-gray-900">
                   Contact
                 </a>
+
+                <SignedIn>
+                  <Link
+                    href="/itinerary"
+                    className="transition hover:text-gray-900"
+                  >
+                    My Trips
+                  </Link>
+                </SignedIn>
               </nav>
 
               <div className="flex items-center gap-3">
