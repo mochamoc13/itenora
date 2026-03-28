@@ -339,7 +339,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
       href={buildKlookActivityLink(stop.title, trip.destination)}
       target="_blank"
       rel="noopener noreferrer sponsored"
-     className="inline-flex items-center rounded-lg bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"s
+     className="inline-flex items-center rounded-lg bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"
     >
       Check price on Klook → skip queues
     </a>
