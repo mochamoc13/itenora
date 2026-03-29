@@ -14,13 +14,12 @@ export function buildHotelAffiliateLink(params: {
 }) {
   const { destination, area, checkIn, checkOut } = params;
 
-  const url = new URL("https://www.agoda.com/search");
-  const cityQuery = [area, destination].filter(Boolean).join(", ");
+  const query = [area, destination].filter(Boolean).join(", ").trim();
 
-  if (cityQuery) {
-    url.searchParams.set("city", cityQuery);
-  } else if (destination) {
-    url.searchParams.set("city", destination);
+  const url = new URL("https://www.agoda.com/search");
+
+  if (query) {
+    url.searchParams.set("city", query); // ✅ works better than textToSearch
   }
 
   if (checkIn) {
@@ -31,9 +30,12 @@ export function buildHotelAffiliateLink(params: {
     url.searchParams.set("checkOut", checkOut);
   }
 
+  // 👇 IMPORTANT: force Agoda to actually search
+  url.searchParams.set("rooms", "1");
+  url.searchParams.set("adults", "2");
+
   return url.toString();
 }
-
 export function buildBookingAffiliateLink(params: {
   destination?: string;
   area?: string;
