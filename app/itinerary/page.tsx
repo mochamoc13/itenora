@@ -4,37 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import UsageSummary from "@/components/UsageSummary";
 import ShareTripButton from "@/components/ShareTripButton";
-
-function addDays(dateString: string, days: number) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return undefined;
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function buildAgodaLink(params: {
-  destination?: string;
-  checkIn?: string;
-  checkOut?: string;
-}) {
-  const { destination, checkIn, checkOut } = params;
-
-  const url = new URL("https://www.agoda.com/search");
-
-  if (destination) {
-    url.searchParams.set("city", destination);
-  }
-
-  if (checkIn) {
-    url.searchParams.set("checkIn", checkIn);
-  }
-
-  if (checkOut) {
-    url.searchParams.set("checkOut", checkOut);
-  }
-
-  return url.toString();
-}
+import { addDays, buildBookingAffiliateLink } from "@/lib/affiliate";
 
 export default async function ItineraryPage() {
   const { userId } = await auth();
@@ -115,19 +85,23 @@ export default async function ItineraryPage() {
 
             const people = input.people ?? null;
             const budget = input.budget ?? trip.budget ?? null;
+
             const createdAt = trip.created_at
               ? new Date(trip.created_at).toLocaleDateString()
               : "";
 
-            const startDate =
-              trip.start_date ?? input.startDate ?? undefined;
+            const destination = trip.destination || input.destination || "";
+
+            const startDate = trip.start_date ?? input.startDate ?? undefined;
 
             const endDate =
               trip.end_date ??
-              (startDate && days ? addDays(startDate, Math.max(days - 1, 0)) : undefined);
+              (startDate && days
+                ? addDays(startDate, Math.max(days - 1, 0))
+                : undefined);
 
-            const hotelLink = buildAgodaLink({
-              destination: trip.destination || input.destination,
+            const bookingLink = buildBookingAffiliateLink({
+              destination,
               checkIn: startDate,
               checkOut: endDate,
             });
@@ -144,7 +118,7 @@ export default async function ItineraryPage() {
                     </h2>
 
                     <p className="mt-1 text-gray-600">
-                      {trip.destination || "No destination"}
+                      {destination || "No destination"}
                     </p>
 
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
@@ -167,7 +141,7 @@ export default async function ItineraryPage() {
                       ) : null}
 
                       {startDate ? (
-                        <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700">
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-700">
                           Hotel-ready
                         </span>
                       ) : null}
@@ -176,19 +150,21 @@ export default async function ItineraryPage() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Link
                         href={`/trips/${trip.id}`}
-                        className="inline-flex rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                        className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
                       >
                         Open trip
                       </Link>
 
-                      <a
-                        href={hotelLink}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="inline-flex rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
-                      >
-                        Check hotels
-                      </a>
+                      {destination ? (
+                        <a
+                          href={bookingLink}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                        >
+                          Find hotels for this trip
+                        </a>
+                      ) : null}
                     </div>
                   </div>
 
