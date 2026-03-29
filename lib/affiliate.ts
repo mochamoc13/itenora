@@ -18,9 +18,10 @@ export function buildHotelAffiliateLink(params: {
 
   const url = new URL("https://www.agoda.com/search");
 
-  if (query) {
-    url.searchParams.set("city", query); // ✅ works better than textToSearch
-  }
+if (query) {
+  url.searchParams.set("textToSearch", query);
+  url.searchParams.set("city", query);
+}
 
   if (checkIn) {
     url.searchParams.set("checkIn", checkIn);
