@@ -8,8 +8,10 @@ import ShareTripButton from "@/components/ShareTripButton";
 import DownloadImageButton from "@/components/DownloadImageButton";
 import {
   buildHotelAffiliateLink,
+  buildBookingAffiliateLink,
   buildKlookActivityLink,
   isBookableActivity,
+  isTopAttraction, // 👈 ADD THIS
   addDays,
 } from "@/lib/affiliate";
 
@@ -215,7 +217,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             const dayStops = Array.isArray(day.stops) ? day.stops : [];
             const meaningfulArea = getMeaningfulStayArea(dayStops, tripDestination);
             const displayArea = meaningfulArea || tripDestination;
-
             const showHotelBox = Boolean(tripDestination);
 
             const checkIn =
@@ -229,6 +230,13 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                 : undefined;
 
             const hotelLink = buildHotelAffiliateLink({
+              destination: tripDestination,
+              area: meaningfulArea || undefined,
+              checkIn,
+              checkOut,
+            });
+
+            const bookingLink = buildBookingAffiliateLink({
               destination: tripDestination,
               area: meaningfulArea || undefined,
               checkIn,
@@ -273,22 +281,32 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                       ) : (
                         <>
                           View hotel options in{" "}
-                          <span className="font-semibold">{tripDestination}</span>
-                          .
+                          <span className="font-semibold">{tripDestination}</span>.
                         </>
                       )}
                     </p>
 
-                    <a
-                      href={hotelLink}
-                      target="_blank"
-                      rel="noopener noreferrer sponsored"
-                      className="mt-3 inline-flex rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-                    >
-                      {meaningfulArea
-                        ? `Find hotels in ${displayArea}`
-                        : `Find hotels in ${tripDestination}`}
-                    </a>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={hotelLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+                      >
+                        {meaningfulArea
+                          ? `Find hotels in ${displayArea}`
+                          : `Find hotels in ${tripDestination}`}
+                      </a>
+
+                 <a
+  href={bookingLink}
+  target="_blank"
+  rel="noopener noreferrer sponsored"
+  className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+>
+  Compare prices on Booking.com
+</a>
+                    </div>
                   </div>
                 ) : null}
 
@@ -304,6 +322,12 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                             {stop.time || "Anytime"}
                             {stop.area ? ` • ${stop.area}` : ""}
                           </div>
+
+{isTopAttraction(stop.title) && (
+  <div className="text-xs font-semibold text-red-500 mb-1">
+    🔥 Top attraction
+  </div>
+)}
 
                           <h3 className="mt-1 text-lg font-semibold text-gray-900">
                             {stop.title || "Stop"}
@@ -321,34 +345,40 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                         </div>
                       </div>
 
-                <div className="mt-3 flex flex-wrap gap-4 items-center">
+                      <div className="mt-3 flex flex-wrap items-center gap-4">
+                        <a
+                          href={`https://maps.google.com/?q=${encodeURIComponent(
+                            stop.mapQuery ||
+                              `${stop.title || "Stop"}, ${trip.destination || ""}`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          Open on Google Maps
+                        </a>
+
+                  {isBookableActivity(stop.title) && (
   <a
-    href={`https://maps.google.com/?q=${encodeURIComponent(
-      stop.mapQuery ||
-        `${stop.title || "Stop"}, ${trip.destination || ""}`
-    )}`}
+    href={buildKlookActivityLink(stop.title, trip.destination)}
     target="_blank"
-    rel="noopener noreferrer"
-    className="text-sm font-medium text-blue-600 hover:underline"
+    rel="noopener noreferrer sponsored"
+    className={`inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition ${
+      isTopAttraction(stop.title)
+        ? "bg-red-500 text-white hover:bg-red-600"
+        : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+    }`}
   >
-    Open on Google Maps
+    {isTopAttraction(stop.title)
+      ? "🔥 Most popular — check price"
+      : "Check price on Klook"}
   </a>
+)}
 
-  {isBookableActivity(stop.title) && (
-    <a
-      href={buildKlookActivityLink(stop.title, trip.destination)}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
-     className="inline-flex items-center rounded-lg bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"
-    >
-      Check price on Klook → skip queues
-    </a>
-  )}
-
-  <span className="w-full text-xs text-gray-500">
-    Opens in a new tab so you can keep this itinerary open.
-  </span>
-</div>
+                        <span className="w-full text-xs text-gray-500">
+                          Opens in a new tab so you can keep this itinerary open.
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

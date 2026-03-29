@@ -34,6 +34,36 @@ export function buildHotelAffiliateLink(params: {
   return url.toString();
 }
 
+export function buildBookingAffiliateLink(params: {
+  destination?: string;
+  area?: string;
+  checkIn?: string;
+  checkOut?: string;
+}) {
+  const { destination, area, checkIn, checkOut } = params;
+
+  const base = "https://www.booking.com/searchresults.html";
+  const query = [area, destination].filter(Boolean).join(", ");
+
+  const url = new URL(base);
+
+  if (query) {
+    url.searchParams.set("ss", query);
+  }
+
+  if (checkIn) {
+    url.searchParams.set("checkin", checkIn);
+  }
+
+  if (checkOut) {
+    url.searchParams.set("checkout", checkOut);
+  }
+
+  return url.toString(); // replace later with affiliate link
+}
+
+
+
 // ---------- KLOOK (Activities) ----------
 
 type KlookMatch = {
@@ -259,4 +289,23 @@ export function isBookableActivity(title?: string) {
     "blue line",
     "nusa penida",
   ].some((keyword) => t.includes(keyword));
+}
+
+export function isTopAttraction(title?: string) {
+  const t = (title || "").toLowerCase();
+
+  return [
+    "universal",
+    "disney",
+    "zoo",
+    "aquarium",
+    "theme park",
+    "gardens by the bay",
+    "great ocean road",
+    "12 apostles",
+    "twelve apostles",
+    "nusa penida",
+    "lotte world",
+    "teamlab",
+  ].some((k) => t.includes(k));
 }
