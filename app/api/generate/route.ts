@@ -359,13 +359,13 @@ Constraints:
 - Make it map-friendly: cluster areas each day to reduce backtracking.
 `.trim();
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      messages: [
-        { role: "system", content: SCHEMA_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-    });
+   const completion = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    { role: "system", content: SCHEMA_PROMPT },
+    { role: "user", content: userPrompt },
+  ],
+});
 
     const text = completion.choices[0]?.message?.content ?? "";
 
@@ -420,15 +420,15 @@ Constraints:
         };
       });
 
-    const responseBody = {
-      input: safe,
-      itinerary,
-      meta: {
-        generatedAt: new Date().toISOString(),
-        engine: "openai",
-        model: "gpt-5-mini",
-      },
-    };
+const responseBody = {
+  input: safe,
+  itinerary,
+  meta: {
+    generatedAt: new Date().toISOString(),
+    engine: "openai",
+    model: "gpt-4o-mini",
+  },
+};
 
     const tripTitle = `${safe.days}-day ${safe.destination} (${safe.budget})`;
 
