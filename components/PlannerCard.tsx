@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import GeneratingLoader from "@/components/GeneratingLoader";
+import DestinationLookup from "@/components/DestinationLookup";
 
 const PEOPLE_MAP: Record<string, "solo" | "couple" | "family"> = {
   Solo: "solo",
@@ -25,6 +26,14 @@ type UsageInfo = {
   limit: number | "unlimited";
 };
 
+type DestinationOption = {
+  label: string;
+  city?: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
+};
+
 export default function PlannerCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,6 +52,22 @@ export default function PlannerCard() {
   const [destination, setDestination] = React.useState(
     searchParams.get("destination") || "Tokyo"
   );
+  const [destinationData, setDestinationData] =
+    React.useState<DestinationOption | null>(
+      searchParams.get("destination")
+        ? {
+            label: searchParams.get("destination") || "Tokyo",
+            city: searchParams.get("city") || undefined,
+            country: searchParams.get("country") || undefined,
+            lat: searchParams.get("lat")
+              ? Number(searchParams.get("lat"))
+              : undefined,
+            lng: searchParams.get("lng")
+              ? Number(searchParams.get("lng"))
+              : undefined,
+          }
+        : null
+    );
 
   const [people, setPeople] = React.useState<
     "Solo" | "Couple" | "Friends" | "Family"
@@ -158,13 +183,23 @@ export default function PlannerCard() {
       setLoading(true);
       setError("");
 
+      if (!destinationData) {
+        setError("Please select a valid destination from the list");
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          destination: destination.trim() || "Tokyo",
+          destination: destinationData.label,
+          city: destinationData.city,
+          country: destinationData.country,
+          lat: destinationData.lat,
+          lng: destinationData.lng,
           days: safeDays,
           people: PEOPLE_MAP[people],
           budget: BUDGET_MAP[budget],
@@ -212,7 +247,9 @@ export default function PlannerCard() {
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
-      {loading && <GeneratingLoader destination={destination.trim() || "your trip"} />}
+      {loading && (
+        <GeneratingLoader destination={destination.trim() || "your trip"} />
+      )}
 
       <div className="pointer-events-none absolute -inset-10 -z-10 rounded-[2rem] bg-gradient-to-br from-purple-200/40 via-pink-200/25 to-orange-200/30 blur-2xl" />
 
@@ -259,13 +296,24 @@ export default function PlannerCard() {
               <label className="text-xs font-semibold text-gray-700">
                 Destination
               </label>
-              <input
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="Tokyo, Singapore, Bali..."
-                disabled={loading}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
-              />
+              <div className="mt-2">
+                <DestinationLookup
+                  initialValue={destination}
+                  disabled={loading}
+                  onSelect={(item: DestinationOption) => {
+                    setDestinationData(item);
+                    setDestination(item.label);
+                    setError("");
+                  }}
+                  onChangeText={(value: string) => {
+                    setDestination(value);
+                    setDestinationData(null);
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">
+                Choose a real city or country from the list.
+              </p>
             </div>
 
             <div className="md:col-span-3">
@@ -469,8 +517,9 @@ export default function PlannerCard() {
 
               {loading && (
                 <p className="mt-3 text-sm text-gray-500">
-                 ✈️ Finding the best spots, routes & hidden gems…
-Your itinerary will be ready in under a minute.
+                  ✈️ Finding the best spots, routes & hidden gems…
+                  <br />
+                  Your itinerary will be ready in under a minute.
                 </p>
               )}
 

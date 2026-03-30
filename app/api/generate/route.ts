@@ -13,6 +13,10 @@ type BudgetType = "budget" | "mid" | "premium";
 
 type GenerateRequest = {
   destination: string;
+  city?: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
   days: number;
   people: PeopleType;
   budget: BudgetType;
@@ -71,6 +75,23 @@ type ParsedAiItinerary = {
     dailyCostEstimate?: number;
   }>;
 };
+
+type SafeRequest = Required<
+  Omit<
+    GenerateRequest,
+    "startDate" | "arrivalTime" | "departTime" | "city" | "country" | "lat" | "lng"
+  >
+> & {
+  startDate?: string;
+  arrivalTime?: string;
+  departTime?: string;
+  city?: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
+};
+
+type ChunkResult = NonNullable<ParsedAiItinerary["itinerary"]>;
 
 /** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
@@ -153,6 +174,14 @@ function extractJson(raw: string) {
   return cleaned.slice(first, last + 1);
 }
 
+function normalizeKey(value?: string | null) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function enforceDayTimeRules(
   stops: StopWithTime[],
   opts: { minStart?: string | null; maxEnd?: string | null }
@@ -197,6 +226,55 @@ function enforceDayTimeRules(
       time: fmtMinutes(safeStart + step * i),
     };
   });
+}
+
+function dedupeStopsWithinDay(stops: ItineraryStop[], destination: string) {
+  const seen = new Set<string>();
+  const out: ItineraryStop[] = [];
+
+  for (const stop of stops) {
+    const titleKey = normalizeKey(stop.title);
+    const areaKey = normalizeKey(stop.area);
+    const mapKey = normalizeKey(stop.mapQuery);
+    const dedupeKey = [titleKey, areaKey || mapKey].filter(Boolean).join("|");
+
+    if (!dedupeKey) continue;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    out.push({
+      ...stop,
+      mapQuery: stop.mapQuery?.trim()
+        ? stop.mapQuery
+        : `${stop.title}, ${destination}`,
+    });
+  }
+
+  return out;
+}
+
+function ensureMinimumStops(
+  cleanedStops: ItineraryStop[],
+  originalStops: ItineraryStop[],
+  minStops: number
+) {
+  if (cleanedStops.length >= minStops) return cleanedStops;
+
+  const seen = new Set(
+    cleanedStops.map((s) => `${normalizeKey(s.title)}|${normalizeKey(s.area)}`)
+  );
+
+  const topUp = [...cleanedStops];
+
+  for (const stop of originalStops) {
+    const key = `${normalizeKey(stop.title)}|${normalizeKey(stop.area)}`;
+    if (seen.has(key)) continue;
+    topUp.push(stop);
+    seen.add(key);
+    if (topUp.length >= minStops) break;
+  }
+
+  return topUp;
 }
 
 async function logToGoogleSheets(payload: unknown) {
@@ -252,7 +330,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SCHEMA_PROMPT = `
+const GPT5_SCHEMA_PROMPT = `
 Return valid JSON only.
 Do not include markdown.
 Do not include code fences.
@@ -286,30 +364,134 @@ Rules:
 - Top-level must be an object.
 - The object must contain only the key "itinerary".
 - itinerary must be an array.
-- Keep notes short.
+- dailyCostEstimate must equal the sum of costEstimate values.
+- Keep notes short and useful.
 - area should be short.
 - mapQuery should be concise.
-- dailyCostEstimate must equal the sum of costEstimate values.
 `;
 
-async function callModelForChunk(params: {
-  model: string;
+async function callModel(params: {
   prompt: string;
+  maxTokens: number;
 }): Promise<ParsedAiItinerary> {
   const completion = await openai.chat.completions.create({
-    model: params.model,
+    model: "gpt-5-mini",
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SCHEMA_PROMPT },
+      { role: "system", content: GPT5_SCHEMA_PROMPT },
       { role: "user", content: params.prompt },
     ],
     temperature: 0.2,
-    max_tokens: params.model === "gpt-5-mini" ? 2000 : 1600,
+    max_tokens: params.maxTokens,
   });
 
   const text = completion.choices[0]?.message?.content?.trim() ?? "";
   const jsonText = extractJson(text);
   return JSON.parse(jsonText) as ParsedAiItinerary;
+}
+
+function buildDestinationContext(safe: SafeRequest) {
+  return [
+    `Destination: ${safe.destination}`,
+    `City: ${safe.city ?? "not provided"}`,
+    `Country: ${safe.country ?? "not provided"}`,
+    `Latitude: ${typeof safe.lat === "number" ? safe.lat : "not provided"}`,
+    `Longitude: ${typeof safe.lng === "number" ? safe.lng : "not provided"}`,
+  ].join("\n");
+}
+
+function buildChunkPrompt(params: {
+  safe: SafeRequest;
+  chunkIndex: number;
+  chunkCount: number;
+  chunkDays: number;
+  chunkDates: string[];
+  stopsPerDay: number;
+  usedTitles: string[];
+  usedAreas: string[];
+}) {
+  const { safe, chunkIndex, chunkCount, chunkDays, chunkDates, stopsPerDay, usedTitles, usedAreas } =
+    params;
+
+  const interestsText =
+    safe.interests.length > 0 ? safe.interests.join(", ") : "general highlights";
+
+  const isFirstChunk = chunkIndex === 0;
+  const isLastChunk = chunkIndex === chunkCount - 1;
+
+  return `
+Create a ${chunkDays}-day itinerary for part ${chunkIndex + 1} of ${chunkCount}.
+
+${buildDestinationContext(safe)}
+People: ${safe.people}
+Budget: ${safe.budget}
+Pace: ${safe.pace}
+Interests: ${interestsText}
+Dates: ${chunkDates.length ? chunkDates.join(", ") : "flexible"}
+Stops per day: ${stopsPerDay}
+
+Arrival time: ${isFirstChunk ? safe.arrivalTime ?? "not provided" : "not relevant"}
+Departure time: ${isLastChunk ? safe.departTime ?? "not provided" : "not relevant"}
+Kids age group: ${safe.childAges}
+
+Already used stop titles in earlier chunks:
+${usedTitles.length ? usedTitles.join(" | ") : "none"}
+
+Already used areas in earlier chunks:
+${usedAreas.length ? usedAreas.join(" | ") : "none"}
+
+Strict rules:
+- Return JSON ONLY matching the schema exactly.
+- Provide exactly ${stopsPerDay} stops per day.
+- Day numbering inside this chunk must start from 1 and increase by 1.
+- Use the destination exactly as provided. Do not switch to another city or country unless it is a clearly sensible nearby day trip.
+- Use attractive, recognisable, worthwhile places and activities.
+- Avoid generic filler like "local museum", "market", "park", or "shopping street" unless it is a specifically named and worthwhile venue.
+- Do NOT repeat the same attraction, museum, market, lookout, beach, harbour, bridge walk, food market, or neighbourhood across days.
+- Do NOT repeat the same venue from earlier chunks.
+- Each day must feel clearly different from the others.
+- For full sightseeing days, include a mix of morning, afternoon, and evening stops.
+- Only make Day 1 lighter if arrivalTime is provided.
+- Only make the final day lighter if departTime is provided.
+- Middle days should feel like full days, not dinner-only or night-only plans.
+- Make it map-friendly: cluster places each day to reduce backtracking.
+- Prefer named, attractive, high-interest stops over vague categories.
+- If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
+- Include at least 1 kid-appropriate stop per day when kids age group != none.
+- Keep notes short.
+
+Special city guidance:
+- If the destination is Sydney, spread days across clearly different areas such as Circular Quay/The Rocks, Darling Harbour, Bondi/Eastern Beaches, Manly/Northern Beaches, Surry Hills/City, Inner West/Newtown, and sensible nearby day trips.
+- If the destination is a major city, spread days across distinct neighborhoods and iconic nearby areas.
+`.trim();
+}
+
+async function generateChunk(params: {
+  safe: SafeRequest;
+  chunkIndex: number;
+  chunkCount: number;
+  chunkDays: number;
+  chunkDates: string[];
+  stopsPerDay: number;
+  usedTitles: string[];
+  usedAreas: string[];
+}): Promise<ChunkResult> {
+  const prompt = buildChunkPrompt(params);
+
+  const parsed = await callModel({
+    prompt,
+    maxTokens: 2200,
+  });
+
+  const chunk = Array.isArray(parsed.itinerary)
+    ? parsed.itinerary.slice(0, params.chunkDays)
+    : [];
+
+  if (chunk.length === 0) {
+    throw new Error(`Chunk ${params.chunkIndex + 1} returned no days`);
+  }
+
+  return chunk;
 }
 
 export async function POST(req: Request) {
@@ -338,14 +520,12 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as Partial<GenerateRequest>;
 
-    const safe: Required<
-      Omit<GenerateRequest, "startDate" | "arrivalTime" | "departTime">
-    > & {
-      startDate?: string;
-      arrivalTime?: string;
-      departTime?: string;
-    } = {
+    const safe: SafeRequest = {
       destination: String(body.destination ?? "").trim(),
+      city: body.city ? String(body.city).trim() : undefined,
+      country: body.country ? String(body.country).trim() : undefined,
+      lat: typeof body.lat === "number" ? body.lat : undefined,
+      lng: typeof body.lng === "number" ? body.lng : undefined,
       days: clamp(Number(body.days ?? 3), 1, 14),
       people: (body.people ?? "solo") as PeopleType,
       budget: (body.budget ?? "mid") as BudgetType,
@@ -389,82 +569,69 @@ export async function POST(req: Request) {
       ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate!, i))
       : [];
 
-    const interestsText =
-      safe.interests.length > 0
-        ? safe.interests.join(", ")
-        : "general highlights";
-
     const stopsPerDay = getStopsForPace(safe.pace);
-    const dateChunks = chunkArray(dates, 3);
-    const chunkCount = dates.length > 0 ? dateChunks.length : Math.ceil(safe.days / 3);
+    const chunkSize = 3;
+    const dateChunks = dates.length > 0 ? chunkArray(dates, chunkSize) : [];
+    const chunkCount =
+      dates.length > 0 ? dateChunks.length : Math.ceil(safe.days / chunkSize);
 
-    const allGeneratedDays: NonNullable<ParsedAiItinerary["itinerary"]> = [];
-    let globalDayNumber = 1;
+    const resolvedChunks: Array<{
+      chunkIndex: number;
+      chunkDates: string[];
+      chunkDays: number;
+      chunk: ChunkResult;
+    }> = [];
+
+    const usedTitles: string[] = [];
+    const usedAreas: string[] = [];
 
     for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
       const chunkDates = dates.length > 0 ? dateChunks[chunkIndex] : [];
       const chunkDays =
         chunkDates.length > 0
           ? chunkDates.length
-          : Math.min(3, safe.days - chunkIndex * 3);
+          : Math.min(chunkSize, safe.days - chunkIndex * chunkSize);
 
-      const isFirstChunk = chunkIndex === 0;
-      const isLastChunk = chunkIndex === chunkCount - 1;
+      const chunk = await generateChunk({
+        safe,
+        chunkIndex,
+        chunkCount,
+        chunkDays,
+        chunkDates,
+        stopsPerDay,
+        usedTitles: [...usedTitles],
+        usedAreas: [...usedAreas],
+      });
 
-      const chunkPrompt = `
-Create a ${chunkDays}-day itinerary for part ${chunkIndex + 1} of ${chunkCount}.
-
-Destination: ${safe.destination}
-People: ${safe.people}
-Budget: ${safe.budget}
-Pace: ${safe.pace}
-Interests: ${interestsText}
-Dates: ${chunkDates.length ? chunkDates.join(", ") : "flexible"}
-Stops per day: ${stopsPerDay}
-
-Arrival time: ${isFirstChunk ? safe.arrivalTime ?? "not provided" : "not relevant"}
-Departure time: ${isLastChunk ? safe.departTime ?? "not provided" : "not relevant"}
-Kids age group: ${safe.childAges}
-
-Constraints:
-- Return JSON ONLY matching the schema exactly.
-- Provide exactly ${stopsPerDay} stops per day.
-- Day numbering inside this chunk must start from 1 and increase by 1.
-- If arrivalTime is provided and this is the first chunk, Day 1 must start AFTER that time.
-- If departTime is provided and this is the last chunk, the last day must end BEFORE that time.
-- If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
-- Include at least 1 kid-appropriate stop per day when kids age group != none.
-- Make it map-friendly: cluster areas each day to reduce backtracking.
-- Keep notes short.
-`.trim();
-
-      let parsedChunk: ParsedAiItinerary | null = null;
-      let lastError: unknown = null;
-
-      for (const model of ["gpt-4o-mini", "gpt-5-mini"]) {
-        try {
-          parsedChunk = await callModelForChunk({
-            model,
-            prompt: chunkPrompt,
-          });
-          break;
-        } catch (err) {
-          lastError = err;
-          console.error(`Chunk ${chunkIndex + 1} failed on ${model}:`, err);
+      // Update memory of used titles/areas for the next chunk
+      for (const day of chunk) {
+        if (Array.isArray(day.stops)) {
+          for (const stop of day.stops) {
+            if (typeof stop.title === "string" && stop.title.trim()) {
+              usedTitles.push(stop.title.trim());
+            }
+            if (typeof stop.area === "string" && stop.area.trim()) {
+              usedAreas.push(stop.area.trim());
+            }
+          }
         }
       }
 
-      if (!parsedChunk) {
-        console.error("Chunk generation failed:", lastError);
-        return NextResponse.json(
-          { error: `Failed to generate itinerary chunk ${chunkIndex + 1}` },
-          { status: 502 }
-        );
-      }
+      resolvedChunks.push({
+        chunkIndex,
+        chunkDates,
+        chunkDays,
+        chunk,
+      });
+    }
 
-      const chunkItinerary = Array.isArray(parsedChunk.itinerary)
-        ? parsedChunk.itinerary.slice(0, chunkDays)
-        : [];
+    resolvedChunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+    const allGeneratedDays: NonNullable<ParsedAiItinerary["itinerary"]> = [];
+    let globalDayNumber = 1;
+
+    for (const resolved of resolvedChunks) {
+      const chunkItinerary = resolved.chunk.slice(0, resolved.chunkDays);
 
       for (let i = 0; i < chunkItinerary.length; i++) {
         const item = chunkItinerary[i];
@@ -472,7 +639,7 @@ Constraints:
           ...item,
           day: globalDayNumber,
           date:
-            chunkDates[i] ??
+            resolved.chunkDates[i] ??
             (safe.startDate ? addDays(safe.startDate, globalDayNumber - 1) : null),
         });
         globalDayNumber += 1;
@@ -504,7 +671,18 @@ Constraints:
           costEstimate: Number(s.costEstimate) || 0,
         }));
 
-        const dailyCostEstimate = normalizedStops.reduce(
+        const dedupedStops = dedupeStopsWithinDay(normalizedStops, safe.destination);
+
+        const minStopsForDay =
+          isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
+
+        const cleanedStops = ensureMinimumStops(
+          dedupedStops,
+          normalizedStops,
+          minStopsForDay
+        );
+
+        const dailyCostEstimate = cleanedStops.reduce(
           (sum, stop) => sum + stop.costEstimate,
           0
         );
@@ -513,7 +691,7 @@ Constraints:
           day: idx + 1,
           date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
           theme: d.theme || `Day ${idx + 1}`,
-          stops: normalizedStops,
+          stops: cleanedStops,
           dailyCostEstimate,
         };
       });
@@ -524,7 +702,7 @@ Constraints:
       meta: {
         generatedAt: new Date().toISOString(),
         engine: "openai",
-        model: "chunked:gpt-4o-mini->gpt-5-mini-fallback",
+        model: "chunked:gpt-5-mini",
       },
     };
 
@@ -585,6 +763,8 @@ Constraints:
     await logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
+      city: safe.city ?? "",
+      country: safe.country ?? "",
       days: safe.days,
       people: safe.people,
       budget: safe.budget,
@@ -594,7 +774,7 @@ Constraints:
       departTime: safe.departTime ?? "",
       childAges: safe.childAges ?? "none",
       interests: safe.interests,
-      source: "generate_api_openai_chunked",
+      source: "generate_api_openai_gpt5_chunked",
       savedTripId: savedTrip.id,
       clerkUserId: userId,
       plan: usage.plan,
