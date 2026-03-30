@@ -222,33 +222,42 @@ const openai = new OpenAI({
 });
 
 const SCHEMA_PROMPT = `
-Return JSON ONLY. No markdown. No code fences. No explanations. No extra text.
+Return valid JSON only.
+Do not include markdown.
+Do not include code fences.
+Do not include explanations.
+Do not include text before or after the JSON.
+
+Return exactly this object shape:
 
 {
   "itinerary": [
     {
       "day": 1,
-      "date": "YYYY-MM-DD" | null,
+      "date": "YYYY-MM-DD",
       "theme": "string",
       "stops": [
         {
           "time": "09:00",
           "title": "string",
-          "area": "string" | null,
-          "notes": "string" | null,
+          "area": "string",
+          "notes": "string",
           "mapQuery": "string",
-          "costEstimate": number
+          "costEstimate": 0
         }
       ],
-      "dailyCostEstimate": number
+      "dailyCostEstimate": 0
     }
   ]
 }
 
 Rules:
-- stops length must be 4–6 based on pace (relaxed=4, balanced=5, packed=6).
-- time should be realistic.
-- dailyCostEstimate must equal sum(costEstimate).
+- Top-level must be an object.
+- The object must contain only the key "itinerary".
+- itinerary must be an array.
+- stops length must be 4 for relaxed, 5 for balanced, 6 for packed.
+- dailyCostEstimate must equal the sum of costEstimate values.
+- Keep notes short.
 `;
 
 export async function POST(req: Request) {
@@ -325,15 +334,12 @@ export async function POST(req: Request) {
       );
     }
 
-   const startDate = safe.startDate;
-const dates = startDate
-  ? Array.from({ length: safe.days }, (_, i) => addDays(startDate, i))
-  : [];
+    const dates = safe.startDate
+      ? Array.from({ length: safe.days }, (_, i) => addDays(safe.startDate!, i))
+      : [];
 
     const interestsText =
-      Array.isArray(safe.interests) && safe.interests.length > 0
-        ? safe.interests.join(", ")
-        : "general highlights";
+      safe.interests.length > 0 ? safe.interests.join(", ") : "general highlights";
 
     const userPrompt = `
 Create a ${safe.days}-day itinerary.
@@ -351,7 +357,7 @@ Kids age group: ${safe.childAges ?? "none"}
 
 Constraints:
 - Return JSON ONLY matching the schema exactly. No extra keys.
-- Provide 4–6 stops depending on pace.
+- Provide 4-6 stops depending on pace.
 - If arrivalTime is provided, Day 1 must start AFTER that time.
 - If departTime is provided, last day must end BEFORE that time.
 - If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
@@ -359,22 +365,24 @@ Constraints:
 - Make it map-friendly: cluster areas each day to reduce backtracking.
 `.trim();
 
-   const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [
-    { role: "system", content: SCHEMA_PROMPT },
-    { role: "user", content: userPrompt },
-  ],
-   temperature: 0.7,
-  max_tokens: 400,
-});
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SCHEMA_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.2,
+      max_tokens: 1200,
+    });
 
-    const text = completion.choices[0]?.message?.content ?? "";
+    const text = completion.choices[0]?.message?.content?.trim() ?? "";
 
     let parsed: ParsedAiItinerary;
     try {
       parsed = JSON.parse(text) as ParsedAiItinerary;
     } catch {
+      console.error("Raw AI output:", text);
       return NextResponse.json(
         { error: "AI returned non-JSON", raw: text },
         { status: 502 }
@@ -422,15 +430,15 @@ Constraints:
         };
       });
 
-const responseBody = {
-  input: safe,
-  itinerary,
-  meta: {
-    generatedAt: new Date().toISOString(),
-    engine: "openai",
-    model: "gpt-4o-mini",
-  },
-};
+    const responseBody = {
+      input: safe,
+      itinerary,
+      meta: {
+        generatedAt: new Date().toISOString(),
+        engine: "openai",
+        model: "gpt-4o-mini",
+      },
+    };
 
     const tripTitle = `${safe.days}-day ${safe.destination} (${safe.budget})`;
 
