@@ -46,7 +46,7 @@ async function getOrCreateCustomer(userId: string) {
 
   const customer = await stripe.customers.create({
     metadata: {
-      clerk_user_id: userId,
+      clerkUserId: userId,
     },
   });
 
@@ -95,14 +95,11 @@ export async function POST(req: Request) {
 
     const plusPrice = process.env.STRIPE_PLUS_PRICE_ID;
     const proPrice = process.env.STRIPE_PRO_PRICE_ID;
-
     const targetPriceId = requestedPlan === "pro" ? proPrice : plusPrice;
 
     if (!targetPriceId) {
       return NextResponse.json(
-        {
-          error: `Missing Stripe price ID for ${requestedPlan}`,
-        },
+        { error: `Missing Stripe price ID for ${requestedPlan}` },
         { status: 500 }
       );
     }
@@ -111,15 +108,12 @@ export async function POST(req: Request) {
     const profile = await getProfile(userId);
     const customerId = await getOrCreateCustomer(userId);
 
-    // If user is already on the requested plan, just send them back.
     if (profile.plan === requestedPlan) {
       return NextResponse.json({
         url: `${siteUrl}/trips`,
       });
     }
 
-    // If user is already paid and wants Pro, upgrade the existing subscription in Stripe
-    // instead of trying to create a second checkout subscription.
     if (profile.plan === "plus" && requestedPlan === "pro") {
       const activeSubscription = await findActiveSubscription(customerId);
 
@@ -154,7 +148,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Free -> Plus or Free -> Pro uses Checkout
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -163,9 +156,10 @@ export async function POST(req: Request) {
       success_url: `${siteUrl}/trips`,
       cancel_url: `${siteUrl}/trips`,
       allow_promotion_codes: true,
+      client_reference_id: userId,
       metadata: {
-        clerk_user_id: userId,
-        selected_plan: requestedPlan,
+        clerkUserId: userId,
+        selectedPlan: requestedPlan,
       },
     });
 

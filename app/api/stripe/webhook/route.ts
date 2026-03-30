@@ -12,21 +12,23 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function getPlanFromPriceId(priceId: string | null | undefined) {
+type AppPlan = "free" | "plus" | "pro";
+
+function getPlanFromPriceId(priceId: string | null | undefined): AppPlan {
   if (!priceId) return "free";
 
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID) {
+  if (priceId === process.env.STRIPE_PLUS_PRICE_ID) {
     return "plus";
   }
 
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID) {
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
     return "pro";
   }
 
   return "free";
 }
 
-async function updateUserPlan(userId: string, plan: string) {
+async function updateUserPlan(userId: string, plan: AppPlan) {
   const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
     {
       user_id: userId,
@@ -70,6 +72,161 @@ async function updateUserPlan(userId: string, plan: string) {
     console.error("Usage upsert error:", usageUpsertError);
     throw new Error(usageUpsertError.message);
   }
+}
+
+async function upsertProfileFromCheckoutSession(session: Stripe.Checkout.Session) {
+  const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+    expand: ["line_items.data.price"],
+  });
+
+  console.log("FULL session metadata:", fullSession.metadata);
+  console.log("FULL session client_reference_id:", fullSession.client_reference_id);
+
+  const clerkUserId =
+    fullSession.metadata?.clerkUserId ??
+    fullSession.metadata?.clerk_user_id ??
+    fullSession.client_reference_id ??
+    null;
+
+  console.log("Resolved clerkUserId:", clerkUserId);
+
+  if (!clerkUserId) {
+    console.error("Missing clerk user id in checkout session");
+    return;
+  }
+
+  const resolvedPriceId = fullSession.line_items?.data?.[0]?.price?.id ?? null;
+  const selectedPlanFromMetadata =
+    (fullSession.metadata?.selectedPlan as AppPlan | undefined) ??
+    (fullSession.metadata?.selected_plan as AppPlan | undefined) ??
+    undefined;
+
+  const plan =
+    selectedPlanFromMetadata && ["plus", "pro"].includes(selectedPlanFromMetadata)
+      ? selectedPlanFromMetadata
+      : getPlanFromPriceId(resolvedPriceId);
+
+  console.log("resolvedPriceId:", resolvedPriceId);
+  console.log("resolvedPlan:", plan);
+
+  const stripeCustomerId =
+    typeof fullSession.customer === "string"
+      ? fullSession.customer
+      : fullSession.customer?.id ?? null;
+
+  const stripeSubscriptionId =
+    typeof fullSession.subscription === "string"
+      ? fullSession.subscription
+      : fullSession.subscription?.id ?? null;
+
+  const { error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .upsert(
+      {
+        user_id: clerkUserId,
+        plan,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        stripe_price_id: resolvedPriceId,
+        subscription_status: "active",
+      },
+      { onConflict: "user_id" }
+    );
+
+  if (profileError) {
+    console.error("Profile upsert error:", profileError);
+    throw new Error(profileError.message);
+  }
+
+  await updateUserPlan(clerkUserId, plan);
+  console.log("User plan update success:", clerkUserId, plan);
+}
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  console.log("Webhook fired: customer.subscription.updated");
+  console.log("subscription.id:", subscription.id);
+
+  const priceId = subscription.items.data[0]?.price?.id ?? null;
+  const plan = getPlanFromPriceId(priceId);
+
+  const stripeCustomerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("user_id")
+    .eq("stripe_customer_id", stripeCustomerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Profile lookup error:", error);
+    throw new Error(error.message);
+  }
+
+  if (!data?.user_id) {
+    console.error("No user found for stripe customer:", stripeCustomerId);
+    return;
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      plan,
+      stripe_price_id: priceId,
+      stripe_subscription_id: subscription.id,
+      subscription_status: subscription.status,
+    })
+    .eq("user_id", data.user_id);
+
+  if (updateError) {
+    console.error("Profile update error:", updateError);
+    throw new Error(updateError.message);
+  }
+
+  await updateUserPlan(data.user_id, plan);
+  console.log("Subscription updated to:", plan, "for", data.user_id);
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  console.log("Webhook fired: customer.subscription.deleted");
+  console.log("subscription.id:", subscription.id);
+
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("user_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Profile lookup error:", error);
+    throw new Error(error.message);
+  }
+
+  if (!data?.user_id) {
+    console.error(
+      "Could not resolve clerk user id for deleted subscription",
+      subscription.id
+    );
+    return;
+  }
+
+  const { error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      plan: "free",
+      subscription_status: "canceled",
+    })
+    .eq("user_id", data.user_id);
+
+  if (profileError) {
+    console.error("Profile downgrade error:", profileError);
+    throw new Error(profileError.message);
+  }
+
+  await updateUserPlan(data.user_id, "free");
+  console.log("User downgraded to free:", data.user_id);
 }
 
 export async function GET() {
@@ -122,179 +279,23 @@ export async function POST(req: Request) {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-
         console.log("Webhook fired: checkout.session.completed");
-        console.log("session.id:", session.id);
+        const session = event.data.object as Stripe.Checkout.Session;
+        await upsertProfileFromCheckoutSession(session);
+        break;
+      }
 
-        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ["line_items.data.price"],
-        });
-
-        console.log("FULL session metadata:", fullSession.metadata);
-        console.log(
-          "FULL session client_reference_id:",
-          fullSession.client_reference_id
-        );
-
-        const clerkUserId =
-          fullSession.metadata?.clerkUserId ??
-          fullSession.client_reference_id ??
-          null;
-
-        console.log("clerkUserId:", clerkUserId);
-
-        if (!clerkUserId) {
-          console.error("Missing clerk user id in checkout session");
-          break;
-        }
-
-        const resolvedPriceId =
-          fullSession.line_items?.data?.[0]?.price?.id ?? null;
-
-        const plan = getPlanFromPriceId(resolvedPriceId);
-
-        console.log("resolvedPriceId:", resolvedPriceId);
-        console.log("resolvedPlan:", plan);
-
-        const stripeCustomerId =
-          typeof fullSession.customer === "string"
-            ? fullSession.customer
-            : fullSession.customer?.id ?? null;
-
-        const stripeSubscriptionId =
-          typeof fullSession.subscription === "string"
-            ? fullSession.subscription
-            : fullSession.subscription?.id ?? null;
-
-        console.log("About to upsert profile", {
-          clerkUserId,
-          plan,
-          stripeCustomerId,
-          stripeSubscriptionId,
-          resolvedPriceId,
-        });
-
-        const { error: profileError } = await supabaseAdmin
-          .from("profiles")
-          .upsert(
-            {
-              user_id: clerkUserId,
-              plan,
-              stripe_customer_id: stripeCustomerId,
-              stripe_subscription_id: stripeSubscriptionId,
-              stripe_price_id: resolvedPriceId,
-              subscription_status: "active",
-            },
-            { onConflict: "user_id" }
-          );
-
-        if (profileError) {
-          console.error("Profile upsert error:", profileError);
-          throw new Error(profileError.message);
-        }
-
-        console.log("Profile upsert success");
-
-        await updateUserPlan(clerkUserId, plan);
-        console.log("User plan update success");
-
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(subscription);
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-
-        console.log("Webhook fired: customer.subscription.deleted");
-        console.log("subscription.id:", subscription.id);
-
-        const { data, error } = await supabaseAdmin
-          .from("profiles")
-          .select("user_id")
-          .eq("stripe_subscription_id", subscription.id)
-          .single();
-
-        if (error) {
-          console.error("Profile lookup error:", error);
-          throw new Error(error.message);
-        }
-
-        if (data?.user_id) {
-          const { error: profileError } = await supabaseAdmin
-            .from("profiles")
-            .update({
-              plan: "free",
-              subscription_status: "canceled",
-            })
-            .eq("user_id", data.user_id);
-
-          if (profileError) {
-            console.error("Profile downgrade error:", profileError);
-            throw new Error(profileError.message);
-          }
-
-          await updateUserPlan(data.user_id, "free");
-          console.log("User downgraded to free:", data.user_id);
-        } else {
-          console.error(
-            "Could not resolve clerk user id for deleted subscription",
-            subscription.id
-          );
-        }
-
+        await handleSubscriptionDeleted(subscription);
         break;
       }
-
-case "customer.subscription.updated": {
-  const subscription = event.data.object as Stripe.Subscription;
-
-  console.log("Webhook fired: customer.subscription.updated");
-  console.log("subscription.id:", subscription.id);
-
-  const priceId = subscription.items.data[0]?.price?.id ?? null;
-  const plan = getPlanFromPriceId(priceId);
-
-  console.log("Updated subscription priceId:", priceId);
-  console.log("Updated plan:", plan);
-
-  const stripeCustomerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("user_id")
-    .eq("stripe_customer_id", stripeCustomerId)
-    .single();
-
-  if (error) {
-    console.error("Profile lookup error:", error);
-    break;
-  }
-
-  if (data?.user_id) {
-    const { error: updateError } = await supabaseAdmin
-      .from("profiles")
-      .update({
-        plan,
-        stripe_price_id: priceId,
-        stripe_subscription_id: subscription.id,
-        subscription_status: subscription.status,
-      })
-      .eq("user_id", data.user_id);
-
-    if (updateError) {
-      console.error("Profile update error:", updateError);
-      throw new Error(updateError.message);
-    }
-
-    await updateUserPlan(data.user_id, plan);
-    console.log("Subscription updated to:", plan);
-  }
-
-  break;
-}
 
       default:
         console.log("Unhandled Stripe event:", event.type);

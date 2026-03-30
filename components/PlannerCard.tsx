@@ -469,7 +469,8 @@ export default function PlannerCard() {
 
               {loading && (
                 <p className="mt-3 text-sm text-gray-500">
-                  Building your itinerary now. This usually takes 10–20 seconds.
+                 ✈️ Finding the best spots, routes & hidden gems…
+Your itinerary will be ready in under a minute.
                 </p>
               )}
 

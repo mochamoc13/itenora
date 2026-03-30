@@ -12,6 +12,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type AppPlan = "free" | "plus" | "pro";
+
 export async function POST() {
   try {
     const { userId } = await auth();
@@ -22,7 +24,7 @@ export async function POST() {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("plan, stripe_customer_id")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -30,37 +32,37 @@ export async function POST() {
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
+    const plan = (profile?.plan as AppPlan | null) ?? "free";
     let stripeCustomerId = profile?.stripe_customer_id ?? null;
 
-    if (stripeCustomerId) {
-      try {
-        const existing = await stripe.customers.retrieve(stripeCustomerId);
-
-        if ("deleted" in existing && existing.deleted) {
-          stripeCustomerId = null;
-        }
-      } catch {
-        stripeCustomerId = null;
-      }
+    if (plan === "free") {
+      return NextResponse.json(
+        { error: "No active paid plan found. Please upgrade first." },
+        { status: 400 }
+      );
     }
 
     if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        metadata: {
-          clerk_user_id: userId,
-        },
-      });
+      return NextResponse.json(
+        { error: "No Stripe customer found for this account." },
+        { status: 400 }
+      );
+    }
 
-      stripeCustomerId = customer.id;
+    try {
+      const existing = await stripe.customers.retrieve(stripeCustomerId);
 
-      const { error: updateError } = await supabaseAdmin
-        .from("profiles")
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq("user_id", userId);
-
-      if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      if ("deleted" in existing && existing.deleted) {
+        return NextResponse.json(
+          { error: "Stripe customer record is no longer available." },
+          { status: 400 }
+        );
       }
+    } catch {
+      return NextResponse.json(
+        { error: "Unable to verify Stripe customer." },
+        { status: 400 }
+      );
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

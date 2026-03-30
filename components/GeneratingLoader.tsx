@@ -41,7 +41,8 @@ export default function GeneratingLoader({
             {destination
               ? `Planning your trip to ${destination}.`
               : "Planning your trip."}{" "}
-            This usually takes 10–20 seconds.
+            ✈️ Finding the best spots, routes & hidden gems…
+Your itinerary will be ready in under a minute.
           </p>
 
           <div className="mt-5 space-y-2 text-sm text-gray-500">
