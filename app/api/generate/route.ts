@@ -365,6 +365,8 @@ Constraints:
     { role: "system", content: SCHEMA_PROMPT },
     { role: "user", content: userPrompt },
   ],
+   temperature: 0.7,
+  max_tokens: 400,
 });
 
     const text = completion.choices[0]?.message?.content ?? "";
