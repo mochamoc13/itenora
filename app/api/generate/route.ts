@@ -378,26 +378,51 @@ async function callModel(params: {
     model: "gpt-5-mini",
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: GPT5_SCHEMA_PROMPT },
+      { role: "developer", content: GPT5_SCHEMA_PROMPT },
       { role: "user", content: params.prompt },
     ],
     max_completion_tokens: params.maxTokens,
   });
 
-  const content = completion.choices[0]?.message?.content ?? "";
+  const message = completion.choices[0]?.message;
+  const content = message?.content;
 
-  if (!content || !content.trim()) {
+  let text = "";
+
+  if (typeof content === "string") {
+    text = content.trim();
+  } else if (Array.isArray(content)) {
+    text = content
+      .map((part) => {
+        if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
+          return part.text;
+        }
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  if (!text) {
+    const refusal =
+      typeof message?.refusal === "string" ? message.refusal.trim() : "";
+
+    if (refusal) {
+      throw new Error(`Model refusal: ${refusal}`);
+    }
+
+    console.error("Empty model message:", JSON.stringify(message, null, 2));
     throw new Error("Model returned empty response");
   }
 
   try {
-    return JSON.parse(content) as ParsedAiItinerary;
+    return JSON.parse(text) as ParsedAiItinerary;
   } catch {
     try {
-      const jsonText = extractJson(content);
+      const jsonText = extractJson(text);
       return JSON.parse(jsonText) as ParsedAiItinerary;
     } catch {
-      console.error("Raw model response:", content);
+      console.error("Raw model response:", text);
       throw new Error("Model returned invalid JSON");
     }
   }
