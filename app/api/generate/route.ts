@@ -375,7 +375,7 @@ async function callModel(params: {
   maxTokens: number;
 }): Promise<ParsedAiItinerary> {
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       { role: "developer", content: GPT5_SCHEMA_PROMPT },
@@ -728,7 +728,7 @@ export async function POST(req: Request) {
       meta: {
         generatedAt: new Date().toISOString(),
         engine: "openai",
-        model: "chunked:gpt-5-mini",
+        model: "chunked:gpt-4o-mini",
       },
     };
 
