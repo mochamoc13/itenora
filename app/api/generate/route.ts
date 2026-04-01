@@ -374,20 +374,33 @@ async function callModel(params: {
   prompt: string;
   maxTokens: number;
 }): Promise<ParsedAiItinerary> {
-const completion = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  response_format: { type: "json_object" },
-  messages: [
-    { role: "system", content: GPT5_SCHEMA_PROMPT },
-    { role: "user", content: params.prompt },
-  ],
- 
-  max_completion_tokens: params.maxTokens,
-});
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: GPT5_SCHEMA_PROMPT },
+      { role: "user", content: params.prompt },
+    ],
+    max_completion_tokens: params.maxTokens,
+  });
 
-  const text = completion.choices[0]?.message?.content?.trim() ?? "";
-  const jsonText = extractJson(text);
-  return JSON.parse(jsonText) as ParsedAiItinerary;
+  const content = completion.choices[0]?.message?.content ?? "";
+
+  if (!content || !content.trim()) {
+    throw new Error("Model returned empty response");
+  }
+
+  try {
+    return JSON.parse(content) as ParsedAiItinerary;
+  } catch {
+    try {
+      const jsonText = extractJson(content);
+      return JSON.parse(jsonText) as ParsedAiItinerary;
+    } catch {
+      console.error("Raw model response:", content);
+      throw new Error("Model returned invalid JSON");
+    }
+  }
 }
 
 function buildDestinationContext(safe: SafeRequest) {
@@ -410,8 +423,16 @@ function buildChunkPrompt(params: {
   usedTitles: string[];
   usedAreas: string[];
 }) {
-  const { safe, chunkIndex, chunkCount, chunkDays, chunkDates, stopsPerDay, usedTitles, usedAreas } =
-    params;
+  const {
+    safe,
+    chunkIndex,
+    chunkCount,
+    chunkDays,
+    chunkDates,
+    stopsPerDay,
+    usedTitles,
+    usedAreas,
+  } = params;
 
   const interestsText =
     safe.interests.length > 0 ? safe.interests.join(", ") : "general highlights";
@@ -603,7 +624,6 @@ export async function POST(req: Request) {
         usedAreas: [...usedAreas],
       });
 
-      // Update memory of used titles/areas for the next chunk
       for (const day of chunk) {
         if (Array.isArray(day.stops)) {
           for (const stop of day.stops) {
