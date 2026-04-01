@@ -394,7 +394,12 @@ async function callModel(params: {
   } else if (Array.isArray(content)) {
     text = content
       .map((part) => {
-        if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
+        if (
+          part &&
+          typeof part === "object" &&
+          "text" in part &&
+          typeof part.text === "string"
+        ) {
           return part.text;
         }
         return "";
