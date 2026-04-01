@@ -384,81 +384,15 @@ async function callModel(params: {
     max_completion_tokens: params.maxTokens,
   });
 
-  const message = completion.choices[0]?.message;
-  const content = message?.content;
+  const content = completion.choices[0]?.message?.content;
 
-  let text = "";
-
-  if (typeof content === "string") {
-    text = content.trim();
-  } else if (Array.isArray(content)) {
-    text = content
-      .map((part) => {
-        if (
-          part &&
-          typeof part === "object" &&
-          "text" in part &&
-          typeof part.text === "string"
-        ) {
-          return part.text;
-        }
-        return "";
-      })
-      .join("")
-      .trim();
-  }
+  const text =
+    typeof content === "string"
+      ? content.trim()
+      : "";
 
   if (!text) {
-    const refusal =
-      typeof message?.refusal === "string" ? message.refusal.trim() : "";
-
-    async function callModel(params: {
-  prompt: string;
-  maxTokens: number;
-}): Promise<ParsedAiItinerary> {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "developer", content: GPT5_SCHEMA_PROMPT },
-      { role: "user", content: params.prompt },
-    ],
-    max_completion_tokens: params.maxTokens,
-  });
-
-  const message = completion.choices[0]?.message;
-  const rawContent: unknown = message?.content;
-
-  let text = "";
-
-  if (typeof rawContent === "string") {
-    text = rawContent.trim();
-  } else if (Array.isArray(rawContent)) {
-    text = rawContent
-      .map((part: unknown) => {
-        if (
-          part &&
-          typeof part === "object" &&
-          "text" in part &&
-          typeof (part as { text?: unknown }).text === "string"
-        ) {
-          return (part as { text: string }).text;
-        }
-        return "";
-      })
-      .join("")
-      .trim();
-  }
-
-  if (!text) {
-    const refusal =
-      typeof message?.refusal === "string" ? message.refusal.trim() : "";
-
-    if (refusal) {
-      throw new Error(`Model refusal: ${refusal}`);
-    }
-
-    console.error("Empty model message:", JSON.stringify(message, null, 2));
+    console.error("Empty model message:", JSON.stringify(completion.choices[0]?.message, null, 2));
     throw new Error("Model returned empty response");
   }
 
