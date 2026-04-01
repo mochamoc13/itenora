@@ -374,16 +374,16 @@ async function callModel(params: {
   prompt: string;
   maxTokens: number;
 }): Promise<ParsedAiItinerary> {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: GPT5_SCHEMA_PROMPT },
-      { role: "user", content: params.prompt },
-    ],
-    temperature: 0.2,
-    max_tokens: params.maxTokens,
-  });
+const completion = await openai.chat.completions.create({
+  model: "gpt-5-mini",
+  response_format: { type: "json_object" },
+  messages: [
+    { role: "system", content: GPT5_SCHEMA_PROMPT },
+    { role: "user", content: params.prompt },
+  ],
+  temperature: 0.2,
+  max_completion_tokens: params.maxTokens,
+});
 
   const text = completion.choices[0]?.message?.content?.trim() ?? "";
   const jsonText = extractJson(text);
