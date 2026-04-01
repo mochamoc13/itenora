@@ -381,7 +381,7 @@ const completion = await openai.chat.completions.create({
     { role: "system", content: GPT5_SCHEMA_PROMPT },
     { role: "user", content: params.prompt },
   ],
-  temperature: 0.2,
+ 
   max_completion_tokens: params.maxTokens,
 });
 
