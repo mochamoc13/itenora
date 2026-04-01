@@ -38,19 +38,20 @@ export default async function Home() {
               AI trip planning in minutes
             </div>
 
-            <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.02] tracking-tight text-gray-950 md:text-6xl">
-              Plan your trip{" "}
-              <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
-                with AI
-              </span>
-              , without the stress.
-            </h1>
+   <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.02] tracking-tight text-gray-950 md:text-6xl">
+  Itenora helps you plan your trip{" "}
+  <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
+    with AI
+  </span>
+  , without the stress.
+</h1>
 
-            <p className="mt-5 max-w-xl text-lg leading-8 text-gray-700">
-              Tell Itenora where you’re going, when, your budget, and who’s
-              joining. Get a smart day-by-day itinerary with better routes, food
-              picks, and practical plans that actually fit your trip.
-            </p>
+<p className="mt-5 max-w-xl text-lg leading-8 text-gray-700">
+  Itenora is an AI travel itinerary planner for families, couples, and
+  solo travellers. Tell us where you’re going, when, your budget, and
+  who’s joining, and get a smart day-by-day itinerary with better
+  routes, food picks, and practical plans that actually fit your trip.
+</p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a
@@ -199,10 +200,10 @@ export default async function Home() {
               <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
                 How it works
               </h2>
-              <p className="mt-2 max-w-2xl text-gray-700">
-                A simple flow that turns your preferences into a day-by-day trip
-                plan you can actually follow.
-              </p>
+   <p className="mt-2 max-w-2xl text-gray-700">
+  Itenora turns your destination, dates, budget, and travel style into
+  a practical day-by-day itinerary you can actually follow.
+</p>
             </div>
             <div className="text-sm text-gray-600">
               <span className="font-medium text-gray-900">~60 seconds</span> to

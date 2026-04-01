@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { checkUsage } from "@/lib/usage";
 import { makeTripSlug, addSlugSuffix } from "@/lib/slug";
 
 /** ---------- Types ---------- */
@@ -10,6 +9,7 @@ type PeopleType = "solo" | "couple" | "family";
 type Pace = "relaxed" | "balanced" | "packed";
 type ChildAges = "none" | "baby" | "toddler" | "kids" | "teens";
 type BudgetType = "budget" | "mid" | "premium";
+type AppPlan = "free" | "plus" | "pro";
 
 type GenerateRequest = {
   destination: string;
@@ -92,6 +92,16 @@ type SafeRequest = Required<
 };
 
 type ChunkResult = NonNullable<ParsedAiItinerary["itinerary"]>;
+
+type UsageInfo = {
+  allowed: boolean;
+  plan: AppPlan;
+  used: number;
+  limit: number;
+  periodKey: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+};
 
 /** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
@@ -292,15 +302,95 @@ async function logToGoogleSheets(payload: unknown) {
   }
 }
 
-async function incrementUsage(userId: string, plan: string) {
+function isPaidPlan(plan: AppPlan) {
+  return plan === "plus" || plan === "pro";
+}
+
+function getPlanLimit(plan: AppPlan) {
+  if (plan === "plus") return 20;
+  if (plan === "pro") return Number.POSITIVE_INFINITY;
+  return 4;
+}
+
+function getFreeMonthKey(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+async function getUsage(userId: string): Promise<UsageInfo> {
   const supabase = createSupabaseServerClient();
-  const month = new Date().toISOString().slice(0, 7);
+  const now = new Date();
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("plan, subscription_status, current_period_start, current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("Profile read error:", profileError);
+    throw new Error("Failed to read billing profile");
+  }
+
+  const rawPlan = (profile?.plan ?? "free") as AppPlan;
+  const currentPeriodStart = profile?.current_period_start
+    ? new Date(profile.current_period_start)
+    : null;
+  const currentPeriodEnd = profile?.current_period_end
+    ? new Date(profile.current_period_end)
+    : null;
+
+  const paidActive =
+    isPaidPlan(rawPlan) &&
+    (profile?.subscription_status === "active" ||
+      profile?.subscription_status === "trialing") &&
+    currentPeriodStart !== null &&
+    currentPeriodEnd !== null &&
+    now >= currentPeriodStart &&
+    now < currentPeriodEnd;
+
+  const effectivePlan: AppPlan = paidActive ? rawPlan : "free";
+  const limit = getPlanLimit(effectivePlan);
+
+  const periodKey = paidActive
+    ? currentPeriodStart!.toISOString()
+    : getFreeMonthKey(now);
+
+  const periodStart = paidActive ? currentPeriodStart!.toISOString() : null;
+  const periodEnd = paidActive ? currentPeriodEnd!.toISOString() : null;
+
+  const { data: usageRow, error: usageError } = await supabase
+    .from("user_usage")
+    .select("itineraries")
+    .eq("user_id", userId)
+    .eq("period_key", periodKey)
+    .maybeSingle();
+
+  if (usageError) {
+    console.error("Usage read error:", usageError);
+    throw new Error("Failed to read usage");
+  }
+
+  const used = usageRow?.itineraries ?? 0;
+
+  return {
+    allowed: used < limit,
+    plan: effectivePlan,
+    used,
+    limit,
+    periodKey,
+    periodStart,
+    periodEnd,
+  };
+}
+
+async function incrementUsage(userId: string, usage: UsageInfo) {
+  const supabase = createSupabaseServerClient();
 
   const { data: existing, error: readError } = await supabase
     .from("user_usage")
     .select("itineraries")
     .eq("user_id", userId)
-    .eq("month", month)
+    .eq("period_key", usage.periodKey)
     .maybeSingle();
 
   if (readError) {
@@ -313,11 +403,13 @@ async function incrementUsage(userId: string, plan: string) {
   const { error: upsertError } = await supabase.from("user_usage").upsert(
     {
       user_id: userId,
-      month,
-      plan,
+      period_key: usage.periodKey,
+      period_start: usage.periodStart,
+      period_end: usage.periodEnd,
+      plan: usage.plan,
       itineraries: nextCount,
     },
-    { onConflict: "user_id,month" }
+    { onConflict: "user_id,period_key" }
   );
 
   if (upsertError) {
@@ -530,16 +622,15 @@ export async function POST(req: Request) {
 
   try {
     const supabase = createSupabaseServerClient();
-
-    const usage = await checkUsage(userId);
+    const usage = await getUsage(userId);
 
     if (!usage.allowed) {
       const limitLabel =
-        usage.limit === Infinity ? "unlimited" : String(usage.limit);
+        usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : String(usage.limit);
 
       return NextResponse.json(
         {
-          error: `You have reached your monthly limit of ${limitLabel} itineraries on the ${usage.plan} plan.`,
+          error: `You have reached your limit of ${limitLabel} itineraries for the current billing period on the ${usage.plan} plan.`,
         },
         { status: 429 }
       );
@@ -784,7 +875,9 @@ export async function POST(req: Request) {
       );
     }
 
-    await incrementUsage(userId, usage.plan);
+    await incrementUsage(userId, usage);
+
+    const nextUsed = usage.used + 1;
 
     await logToGoogleSheets({
       type: "itinerary",
@@ -804,8 +897,11 @@ export async function POST(req: Request) {
       savedTripId: savedTrip.id,
       clerkUserId: userId,
       plan: usage.plan,
-      monthlyCount: usage.used + 1,
-      monthlyLimit: usage.limit === Infinity ? "unlimited" : usage.limit,
+      usageCount: nextUsed,
+      usageLimit: usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
+      periodKey: usage.periodKey,
+      periodStart: usage.periodStart,
+      periodEnd: usage.periodEnd,
     });
 
     return NextResponse.json({
@@ -813,8 +909,11 @@ export async function POST(req: Request) {
       savedTrip,
       usage: {
         plan: usage.plan,
-        used: usage.used + 1,
-        limit: usage.limit === Infinity ? "unlimited" : usage.limit,
+        used: nextUsed,
+        limit: usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
+        periodKey: usage.periodKey,
+        periodStart: usage.periodStart,
+        periodEnd: usage.periodEnd,
       },
     });
   } catch (err: unknown) {

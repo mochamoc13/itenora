@@ -21,9 +21,13 @@ const BUDGET_MAP: Record<string, "budget" | "mid" | "premium"> = {
 };
 
 type UsageInfo = {
-  plan: string;
+  plan: "free" | "plus" | "pro";
   used: number;
   limit: number | "unlimited";
+  usageLabel?: string;
+  periodType?: "month" | "billing_period";
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
 };
 
 type DestinationOption = {
@@ -50,13 +54,13 @@ export default function PlannerCard() {
   ] as const;
 
   const [destination, setDestination] = React.useState(
-    searchParams.get("destination") || "Tokyo"
+    searchParams.get("destination") || ""
   );
   const [destinationData, setDestinationData] =
     React.useState<DestinationOption | null>(
       searchParams.get("destination")
         ? {
-            label: searchParams.get("destination") || "Tokyo",
+            label: searchParams.get("destination") || "",
             city: searchParams.get("city") || undefined,
             country: searchParams.get("country") || undefined,
             lat: searchParams.get("lat")
@@ -135,7 +139,7 @@ export default function PlannerCard() {
 
     async function loadUsage() {
       try {
-        const res = await fetch("/api/user/usage", {
+        const res = await fetch("/api/user/plan", {
           cache: "no-store",
         });
 
@@ -215,14 +219,27 @@ export default function PlannerCard() {
       const data = await res.json();
 
       if (data?.usage) {
-        setUsage(data.usage);
+        setUsage({
+          plan: data.usage.plan,
+          used: data.usage.used,
+          limit: data.usage.limit,
+          usageLabel:
+            data.usage.limit === "unlimited"
+              ? `${data.usage.used} itineraries used this billing period`
+              : `${data.usage.used} / ${data.usage.limit} itineraries used ${
+                  data.usage.periodStart ? "this billing period" : "this month"
+                }`,
+          periodType: data.usage.periodStart ? "billing_period" : "month",
+          currentPeriodStart: data.usage.periodStart ?? null,
+          currentPeriodEnd: data.usage.periodEnd ?? null,
+        });
       }
 
       if (!res.ok) {
         if (res.status === 429) {
           setError(
             data.error ||
-              "You have reached your monthly limit. Please upgrade to continue."
+              "You have reached your limit. Please upgrade to continue."
           );
           return;
         }
@@ -244,6 +261,18 @@ export default function PlannerCard() {
       setLoading(false);
     }
   }
+
+  const usageText =
+    usage?.usageLabel ??
+    (usage
+      ? usage.limit === "unlimited"
+        ? "Unlimited itinerary generation"
+        : `${usage.used} / ${usage.limit} itineraries used ${
+            usage.periodType === "billing_period"
+              ? "this billing period"
+              : "this month"
+          }`
+      : "");
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white/70 p-6 shadow-sm backdrop-blur md:p-8">
@@ -271,15 +300,12 @@ export default function PlannerCard() {
       {usage && (
         <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 text-sm">
           <div className="font-semibold capitalize">{usage.plan} plan</div>
-          {usage.limit === "unlimited" ? (
-            <div className="mt-1 text-green-600">
-              Unlimited itinerary generation
+          <div className="mt-1 text-gray-600">{usageText}</div>
+          {usage.periodType === "billing_period" && usage.currentPeriodEnd ? (
+            <div className="mt-1 text-xs text-gray-500">
+            Renews on {new Date(usage.currentPeriodEnd).toLocaleDateString("en-AU")}
             </div>
-          ) : (
-            <div className="mt-1 text-gray-600">
-              {usage.used} / {usage.limit} itineraries used this month
-            </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -550,9 +576,14 @@ export default function PlannerCard() {
 
               {usage && (
                 <p className="mt-2 text-xs text-gray-500">
-                  {usage.plan === "pro"
-                    ? `${usage.used} itineraries generated (unlimited)`
-                    : `${usage.used} / ${usage.limit} itineraries used this month`}
+                  {usage.usageLabel ??
+                    (usage.plan === "pro"
+                      ? `${usage.used} itineraries generated (unlimited)`
+                      : `${usage.used} / ${usage.limit} itineraries used ${
+                          usage.periodType === "billing_period"
+                            ? "this billing period"
+                            : "this month"
+                        }`)}
                 </p>
               )}
             </div>

@@ -1,5 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import AccountBillingArea from "@/components/AccountBillingArea";
 import {
@@ -10,7 +11,54 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 
-export const metadata = {
+export const metadata: Metadata = {
+  metadataBase: new URL("https://itenora.com"),
+  title: {
+    default: "Itenora | AI Travel Itinerary Planner",
+    template: "%s | Itenora",
+  },
+  description:
+    "Itenora is an AI travel itinerary planner that helps families, couples, and solo travellers create smart personalised trip plans in seconds.",
+  keywords: [
+    "Itenora",
+    "AI travel planner",
+    "AI itinerary planner",
+    "travel itinerary generator",
+    "family trip planner",
+    "couple trip planner",
+    "solo travel planner",
+    "trip planner",
+    "holiday itinerary planner",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Itenora | AI Travel Itinerary Planner",
+    description:
+      "Plan smarter trips with Itenora. Create personalised itineraries for families, couples, and solo travellers.",
+    url: "https://itenora.com",
+    siteName: "Itenora",
+    locale: "en_AU",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Itenora | AI Travel Itinerary Planner",
+    description:
+      "Create personalised travel itineraries in seconds with Itenora.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   other: {
     "agd-partner-manual-verification": "",
   },
@@ -37,7 +85,7 @@ export default function RootLayout({
                 </div>
 
                 <span className="text-base font-semibold tracking-tight text-gray-900">
-                  itenora
+                  Itenora
                 </span>
               </Link>
 
