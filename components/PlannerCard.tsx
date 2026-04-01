@@ -236,13 +236,13 @@ export default function PlannerCard() {
       }
 
       if (!res.ok) {
-        if (res.status === 429) {
-          setError(
-            data.error ||
-              "You have reached your limit. Please upgrade to continue."
-          );
-          return;
-        }
+   if (res.status === 429) {
+  setError(
+    data.error ||
+      "Please wait a moment before starting another itinerary."
+  );
+  return;
+}
 
         throw new Error(data.error || "Failed to generate itinerary");
       }

@@ -103,6 +103,10 @@ type UsageInfo = {
   periodEnd: string | null;
 };
 
+type GenerationLockResult =
+  | { acquired: true; retryAfterSeconds: 0 }
+  | { acquired: false; retryAfterSeconds: number };
+
 /** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -190,6 +194,19 @@ function normalizeKey(value?: string | null) {
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function parseSupabaseDate(value?: string | null) {
+  if (!value) return null;
+
+  let normalized = value.replace(" ", "T");
+
+  if (/([+-]\d{2})$/.test(normalized)) {
+    normalized = normalized.replace(/([+-]\d{2})$/, "$1:00");
+  }
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function enforceDayTimeRules(
@@ -332,12 +349,8 @@ async function getUsage(userId: string): Promise<UsageInfo> {
   }
 
   const rawPlan = (profile?.plan ?? "free") as AppPlan;
-  const currentPeriodStart = profile?.current_period_start
-    ? new Date(profile.current_period_start)
-    : null;
-  const currentPeriodEnd = profile?.current_period_end
-    ? new Date(profile.current_period_end)
-    : null;
+  const currentPeriodStart = parseSupabaseDate(profile?.current_period_start);
+  const currentPeriodEnd = parseSupabaseDate(profile?.current_period_end);
 
   const paidActive =
     isPaidPlan(rawPlan) &&
@@ -352,11 +365,11 @@ async function getUsage(userId: string): Promise<UsageInfo> {
   const limit = getPlanLimit(effectivePlan);
 
   const periodKey = paidActive
-    ? currentPeriodStart!.toISOString()
+    ? currentPeriodStart.toISOString()
     : getFreeMonthKey(now);
 
-  const periodStart = paidActive ? currentPeriodStart!.toISOString() : null;
-  const periodEnd = paidActive ? currentPeriodEnd!.toISOString() : null;
+  const periodStart = paidActive ? currentPeriodStart.toISOString() : null;
+  const periodEnd = paidActive ? currentPeriodEnd.toISOString() : null;
 
   const { data: usageRow, error: usageError } = await supabase
     .from("user_usage")
@@ -414,6 +427,71 @@ async function incrementUsage(userId: string, usage: UsageInfo) {
 
   if (upsertError) {
     console.error("Usage increment error:", upsertError);
+  }
+}
+
+async function acquireGenerationLock(
+  userId: string,
+  seconds = 45
+): Promise<GenerationLockResult> {
+  const supabase = createSupabaseServerClient();
+  const now = new Date();
+  const lockedUntil = new Date(now.getTime() + seconds * 1000).toISOString();
+
+  const { data: existing, error: readError } = await supabase
+    .from("generation_locks")
+    .select("locked_until")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("Lock read error:", readError);
+    throw new Error("Failed to check generation lock");
+  }
+
+  if (
+    existing?.locked_until &&
+    new Date(existing.locked_until).getTime() > now.getTime()
+  ) {
+    return {
+      acquired: false,
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil(
+          (new Date(existing.locked_until).getTime() - now.getTime()) / 1000
+        )
+      ),
+    };
+  }
+
+  const { error: upsertError } = await supabase
+    .from("generation_locks")
+    .upsert(
+      {
+        user_id: userId,
+        locked_until: lockedUntil,
+      },
+      { onConflict: "user_id" }
+    );
+
+  if (upsertError) {
+    console.error("Lock upsert error:", upsertError);
+    throw new Error("Failed to create generation lock");
+  }
+
+  return { acquired: true, retryAfterSeconds: 0 };
+}
+
+async function releaseGenerationLock(userId: string) {
+  const supabase = createSupabaseServerClient();
+
+  const { error } = await supabase
+    .from("generation_locks")
+    .delete()
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Lock release error:", error);
   }
 }
 
@@ -478,13 +556,13 @@ async function callModel(params: {
 
   const content = completion.choices[0]?.message?.content;
 
-  const text =
-    typeof content === "string"
-      ? content.trim()
-      : "";
+  const text = typeof content === "string" ? content.trim() : "";
 
   if (!text) {
-    console.error("Empty model message:", JSON.stringify(completion.choices[0]?.message, null, 2));
+    console.error(
+      "Empty model message:",
+      JSON.stringify(completion.choices[0]?.message, null, 2)
+    );
     throw new Error("Model returned empty response");
   }
 
@@ -620,13 +698,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Login required" }, { status: 401 });
   }
 
+  const lock = await acquireGenerationLock(userId, 45);
+
+  if (!lock.acquired) {
+    return NextResponse.json(
+      {
+        error: `A trip is already being generated. Please wait about ${lock.retryAfterSeconds} seconds and try again.`,
+      },
+      { status: 429 }
+    );
+  }
+
   try {
     const supabase = createSupabaseServerClient();
     const usage = await getUsage(userId);
 
     if (!usage.allowed) {
       const limitLabel =
-        usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : String(usage.limit);
+        usage.limit === Number.POSITIVE_INFINITY
+          ? "unlimited"
+          : String(usage.limit);
 
       return NextResponse.json(
         {
@@ -757,7 +848,9 @@ export async function POST(req: Request) {
           day: globalDayNumber,
           date:
             resolved.chunkDates[i] ??
-            (safe.startDate ? addDays(safe.startDate, globalDayNumber - 1) : null),
+            (safe.startDate
+              ? addDays(safe.startDate, globalDayNumber - 1)
+              : null),
         });
         globalDayNumber += 1;
       }
@@ -766,7 +859,9 @@ export async function POST(req: Request) {
     const itinerary: ItineraryDay[] = allGeneratedDays
       .slice(0, safe.days)
       .map((d, idx) => {
-        const rawStops = Array.isArray(d.stops) ? (d.stops as StopWithTime[]) : [];
+        const rawStops = Array.isArray(d.stops)
+          ? (d.stops as StopWithTime[])
+          : [];
 
         const isDay1 = idx === 0;
         const isLastDay = idx === safe.days - 1;
@@ -788,7 +883,10 @@ export async function POST(req: Request) {
           costEstimate: Number(s.costEstimate) || 0,
         }));
 
-        const dedupedStops = dedupeStopsWithinDay(normalizedStops, safe.destination);
+        const dedupedStops = dedupeStopsWithinDay(
+          normalizedStops,
+          safe.destination
+        );
 
         const minStopsForDay =
           isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
@@ -898,7 +996,8 @@ export async function POST(req: Request) {
       clerkUserId: userId,
       plan: usage.plan,
       usageCount: nextUsed,
-      usageLimit: usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
+      usageLimit:
+        usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
       periodKey: usage.periodKey,
       periodStart: usage.periodStart,
       periodEnd: usage.periodEnd,
@@ -910,7 +1009,8 @@ export async function POST(req: Request) {
       usage: {
         plan: usage.plan,
         used: nextUsed,
-        limit: usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
+        limit:
+          usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
         periodKey: usage.periodKey,
         periodStart: usage.periodStart,
         periodEnd: usage.periodEnd,
@@ -920,5 +1020,7 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : "Server error";
     console.error("Generate route error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    await releaseGenerationLock(userId);
   }
 }
