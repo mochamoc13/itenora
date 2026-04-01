@@ -264,12 +264,29 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) return;
+  console.log("Webhook fired: invoice.paid");
+  console.log("invoice.id:", invoice.id);
 
-  const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription.id;
+  const parent = invoice.parent;
+
+  if (!parent || parent.type !== "subscription_details") {
+    console.log("invoice.paid has no subscription parent, skipping");
+    return;
+  }
+
+const rawSubscription = invoice.parent?.type === "subscription_details"
+  ? invoice.parent.subscription_details?.subscription
+  : null;
+
+const subscriptionId =
+  typeof rawSubscription === "string"
+    ? rawSubscription
+    : rawSubscription?.id ?? null;
+
+  if (!subscriptionId) {
+    console.log("invoice.paid has no subscription id, skipping");
+    return;
+  }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
@@ -281,13 +298,21 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       ? subscription.customer
       : subscription.customer?.id ?? null;
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("profiles")
     .select("user_id")
     .eq("stripe_customer_id", stripeCustomerId)
     .maybeSingle();
 
-  if (!data?.user_id) return;
+  if (error) {
+    console.error("Profile lookup error:", error);
+    throw new Error(error.message);
+  }
+
+  if (!data?.user_id) {
+    console.error("No user found for stripe customer:", stripeCustomerId);
+    return;
+  }
 
   const period = getSubscriptionItemPeriod(subscription);
 
@@ -309,9 +334,13 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     periodEnd: period.periodEnd,
   });
 
-  console.log("🔥 Usage reset for new billing cycle:", data.user_id);
+  console.log("Invoice paid reset usage:", {
+    userId: data.user_id,
+    plan,
+    currentPeriodStart: period.periodStart,
+    currentPeriodEnd: period.periodEnd,
+  });
 }
-
 /** ---------------- ROUTE ---------------- */
 
 export async function POST(req: Request) {
