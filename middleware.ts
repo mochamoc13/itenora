@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/stripe/session(.*)",
   "/sitemap.xml",
   "/robots.txt",
+  "/trips/share(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
