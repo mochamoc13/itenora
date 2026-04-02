@@ -98,55 +98,81 @@ export default async function ShareTripPage({
       : null;
   const people = input.people ?? null;
   const budget = input.budget ?? trip.budget ?? null;
+  const destination = trip.destination || "this destination";
+  const title =
+    trip.title || `${days ? `${days} Day ` : ""}${destination} Itinerary`;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <div
+      <article
         id="itinerary-image"
         className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
       >
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-          {trip.title || trip.destination || "Shared Trip"}
-        </h1>
+        <header>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            {title}
+          </h1>
 
-        <p className="mt-2 text-gray-600">
-          {trip.destination || "Trip itinerary"}
-        </p>
+          <p className="mt-3 text-base leading-7 text-gray-700">
+            This {days ? `${days}-day ` : ""}{destination} itinerary is designed
+            for {people || "travellers"} looking for a{" "}
+            {budget || "well-balanced"} trip. It covers top attractions, food
+            spots, and easy day-by-day planning to help you explore{" "}
+            {destination} with less stress.
+          </p>
 
-        <div className="mt-4 flex justify-end">
-          <DownloadImageButton />
-        </div>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            Use this sample plan as a travel guide for what to do, where to go,
+            and how to organise each day more smoothly.
+          </p>
 
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
-          {days ? (
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
-              {days} day{days > 1 ? "s" : ""}
-            </span>
-          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+            {days ? (
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                {days} day{days > 1 ? "s" : ""}
+              </span>
+            ) : null}
 
-          {people ? (
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
-              {people}
-            </span>
-          ) : null}
+            {people ? (
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                {people}
+              </span>
+            ) : null}
 
-          {budget ? (
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
-              {budget}
-            </span>
-          ) : null}
-        </div>
+            {budget ? (
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                {budget}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <DownloadImageButton />
+          </div>
+        </header>
 
         <div className="mt-8 space-y-8">
           {itinerary.length > 0 ? (
             itinerary.map((day: any, index: number) => (
-              <section key={index}>
+              <section key={index} className="border-t border-gray-100 pt-6 first:border-t-0 first:pt-0">
                 <h2 className="text-xl font-semibold text-gray-900">
                   Day {day.day ?? index + 1}
+                  {day.title ? ` — ${day.title}` : ""}
                 </h2>
 
+                {day.summary ? (
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    {day.summary}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    Explore the highlights planned for day {day.day ?? index + 1}{" "}
+                    in {destination}.
+                  </p>
+                )}
+
                 <div className="mt-4 space-y-4">
-                  {Array.isArray(day.stops) &&
+                  {Array.isArray(day.stops) && day.stops.length > 0 ? (
                     day.stops.map((stop: any, stopIndex: number) => {
                       const emoji = getStopEmoji(stop.title, stop.notes);
 
@@ -168,10 +194,19 @@ export default async function ShareTripPage({
                             <p className="mt-2 text-sm leading-6 text-gray-600">
                               {stop.notes}
                             </p>
-                          ) : null}
+                          ) : (
+                            <p className="mt-2 text-sm leading-6 text-gray-600">
+                              A recommended stop for this part of your {destination} trip.
+                            </p>
+                          )}
                         </div>
                       );
-                    })}
+                    })
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      No stops listed for this day yet.
+                    </p>
+                  )}
                 </div>
               </section>
             ))
@@ -179,6 +214,17 @@ export default async function ShareTripPage({
             <p className="text-gray-600">No itinerary details available.</p>
           )}
         </div>
+
+        <section className="mt-10 rounded-2xl border border-gray-100 bg-gray-50 p-5">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Travel tip for this itinerary
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            Plans can change depending on weather, opening hours, and how fast
+            you like to travel. Use this itinerary as a flexible guide rather
+            than a strict schedule.
+          </p>
+        </section>
 
         <div className="mt-10 border-t border-gray-200 pt-6 text-center">
           <p className="text-sm text-gray-500">
@@ -188,7 +234,7 @@ export default async function ShareTripPage({
             </Link>
           </p>
         </div>
-      </div>
+      </article>
     </main>
   );
 }
