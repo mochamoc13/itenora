@@ -26,6 +26,10 @@ export async function generateMetadata({
   return {
     title: `${title} | Itenora`,
     description,
+      robots: {
+      index: false,
+      follow: false,
+    },
   };
 }
 
