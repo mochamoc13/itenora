@@ -247,10 +247,10 @@ export default function PlannerCard() {
         throw new Error(data.error || "Failed to generate itinerary");
       }
 
-      if (data.savedTrip?.id) {
-        router.push(`/trips/${data.savedTrip.id}`);
-        return;
-      }
+if (data.savedTrip?.slug) {
+  router.push(`/trips/share/${data.savedTrip.slug}`);
+  return;
+}
 
       router.push("/itinerary");
     } catch (err: unknown) {

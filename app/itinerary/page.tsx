@@ -148,8 +148,8 @@ export default async function ItineraryPage() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                    <Link
-  href={trip.slug ? `/trips/share/${trip.slug}` : `/share/${trip.id}`}
+           <Link
+  href={`/trips/share/${trip.slug}`}
   className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
 >
   Open trip
@@ -174,7 +174,7 @@ export default async function ItineraryPage() {
                       <p className="font-medium text-gray-700">{createdAt}</p>
                     </div>
 
-                   <ShareTripButton slug={trip.slug} />
+                {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
                   </div>
                 </div>
               </div>
