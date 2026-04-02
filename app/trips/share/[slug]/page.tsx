@@ -93,9 +93,12 @@ export default async function PublicTripPage({
         }}
       />
 
-      <h1 className="text-4xl font-bold">{trip.title}</h1>
+  <h1 className="text-4xl font-bold">{trip.title}</h1>
 
-      <p className="text-gray-600">Destination: {trip.destination}</p>
+<p className="text-lg leading-7 text-gray-700">
+  This itinerary for {trip.destination} includes day-by-day suggestions,
+  attractions, food stops, and practical planning ideas to make the trip easier.
+</p>
 
       {itinerary.map((day: any) => (
         <div key={day.day} className="border rounded-xl p-6 space-y-4">
