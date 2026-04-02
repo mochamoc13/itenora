@@ -148,12 +148,12 @@ export default async function ItineraryPage() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Link
-                        href={`/trips/${trip.id}`}
-                        className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                      >
-                        Open trip
-                      </Link>
+                    <Link
+  href={trip.slug ? `/trips/share/${trip.slug}` : `/share/${trip.id}`}
+  className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+>
+  Open trip
+</Link>
 
                       {destination ? (
                         <a
