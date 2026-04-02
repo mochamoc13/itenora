@@ -3,6 +3,32 @@ import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import DownloadImageButton from "@/components/DownloadImageButton";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const supabase = createSupabaseServerClient();
+
+  const { data: trip } = await supabase
+    .from("itineraries")
+    .select("title, destination")
+    .eq("id", params.id)
+    .single();
+
+  const title =
+    trip?.title || `${trip?.destination || "Travel"} Itinerary`;
+
+  const description = `Explore ${
+    trip?.destination || "your destination"
+  } with this detailed itinerary including attractions, food spots, and travel tips.`;
+
+  return {
+    title: `${title} | Itenora`,
+    description,
+  };
+}
+
 function getStopEmoji(title?: string, notes?: string) {
   const text = `${title ?? ""} ${notes ?? ""}`.toLowerCase();
 
