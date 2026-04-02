@@ -174,7 +174,7 @@ export default async function ItineraryPage() {
                       <p className="font-medium text-gray-700">{createdAt}</p>
                     </div>
 
-                    <ShareTripButton tripId={trip.id} />
+                   <ShareTripButton slug={trip.slug} />
                   </div>
                 </div>
               </div>
