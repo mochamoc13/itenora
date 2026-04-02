@@ -2,17 +2,14 @@
 
 import { useState } from "react";
 
-export default function ShareTripButton({ tripId }: { tripId: string }) {
+export default function ShareTripButton({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleShare = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
-    console.log("Share tripId:", tripId);
-
-    const shareUrl = `${window.location.origin}/share/${tripId}`;
-    console.log("Share URL:", shareUrl);
+    const shareUrl = `https://itenora.com/trips/share/${slug}`;
 
     try {
       if (navigator.share) {
