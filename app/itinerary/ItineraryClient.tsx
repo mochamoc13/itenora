@@ -72,8 +72,9 @@ function buildAgodaLink(params: {
   checkIn?: string;
   checkOut?: string;
 }) {
-  const url = new URL("https://www.agoda.com/search");
-  url.searchParams.set("city", params.destination);
+  const url = new URL("https://www.agoda.com/en-au/search");
+  url.searchParams.set("textToSearch", params.destination);
+  url.searchParams.set("cid", "1961701");
 
   if (params.checkIn) {
     url.searchParams.set("checkIn", params.checkIn);
