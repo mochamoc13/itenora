@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { makeTripSlug, addSlugSuffix } from "@/lib/slug";
+import { makeTripSlug } from "@/lib/slug";
 
 /** ---------- Types ---------- */
 type PeopleType = "solo" | "couple" | "family";
