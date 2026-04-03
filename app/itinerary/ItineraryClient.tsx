@@ -106,17 +106,15 @@ function buildAgodaLink(params: {
 }) {
   const cityId = getAgodaCityId(params.destination);
 
-  if (!cityId) {
-    const fallback = new URL("https://www.agoda.com/en-au/");
-    fallback.searchParams.set("cid", "1961701");
-    return fallback.toString();
-  }
+  const url = new URL("https://www.agoda.com/en-au/search");
 
-  const url = new URL("https://www.agoda.com/partners/partnersearch.aspx");
-  url.searchParams.set("pcs", "1");
   url.searchParams.set("cid", "1961701");
-  url.searchParams.set("city", cityId);
-  url.searchParams.set("hl", "en-us");
+
+  if (cityId) {
+    url.searchParams.set("city", cityId);
+  } else {
+    url.searchParams.set("textToSearch", params.destination);
+  }
 
   if (params.checkIn) {
     url.searchParams.set("checkIn", params.checkIn);
