@@ -67,14 +67,56 @@ function addDays(dateString: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+const agodaCityMap: Record<string, string> = {
+  tokyo: "5085",
+  sydney: "14370",
+  brisbane: "9466",
+  bali: "17193",
+  osaka: "9590",
+  kyoto: "1784",
+  seoul: "14690",
+  adelaide: "11981",
+  auckland: "3750",
+  jakarta: "8691",
+  singapore: "4064",
+  "kuala lumpur": "14524",
+  melbourne: "10372",
+  bangkok: "9395", // ✅ ADD THIS
+};
+
+function getAgodaCityId(destination: string) {
+  const key = destination.trim().toLowerCase();
+
+  if (agodaCityMap[key]) return agodaCityMap[key];
+
+  if (key === "japan") return agodaCityMap["tokyo"];
+  if (key === "indonesia") return agodaCityMap["bali"];
+  if (key === "australia") return agodaCityMap["sydney"];
+  if (key === "south korea" || key === "korea") return agodaCityMap["seoul"];
+
+ if (key === "thailand") return agodaCityMap["bangkok"];
+
+  return undefined;
+}
+
 function buildAgodaLink(params: {
   destination: string;
   checkIn?: string;
   checkOut?: string;
 }) {
-  const url = new URL("https://www.agoda.com/en-au/search");
-  url.searchParams.set("textToSearch", params.destination);
+  const cityId = getAgodaCityId(params.destination);
+
+  if (!cityId) {
+    const fallback = new URL("https://www.agoda.com/en-au/");
+    fallback.searchParams.set("cid", "1961701");
+    return fallback.toString();
+  }
+
+  const url = new URL("https://www.agoda.com/partners/partnersearch.aspx");
+  url.searchParams.set("pcs", "1");
   url.searchParams.set("cid", "1961701");
+  url.searchParams.set("city", cityId);
+  url.searchParams.set("hl", "en-us");
 
   if (params.checkIn) {
     url.searchParams.set("checkIn", params.checkIn);
@@ -96,8 +138,13 @@ function getSuggestedStayArea(destination: string) {
   if (d.includes("singapore")) return "Orchard, Bugis, or Marina Bay";
   if (d.includes("sydney")) return "CBD or Darling Harbour";
   if (d.includes("melbourne")) return "CBD or Southbank";
+  if (d.includes("brisbane")) return "CBD or South Bank";
   if (d.includes("seoul")) return "Myeongdong or Hongdae";
   if (d.includes("bangkok")) return "Sukhumvit or Siam";
+  if (d.includes("bali")) return "Seminyak, Canggu, or Ubud";
+  if (d.includes("jakarta")) return "Central Jakarta or Sudirman";
+  if (d.includes("auckland")) return "CBD or Viaduct Harbour";
+  if (d.includes("kuala lumpur")) return "Bukit Bintang or KLCC";
 
   return `central ${destination}`;
 }
