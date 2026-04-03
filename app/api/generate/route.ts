@@ -939,7 +939,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existingSlug?.slug) {
-      slug = addSlugSuffix(baseSlug, Date.now().toString().slice(-6));
+      slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
     }
 
     const { data: savedTrip, error: saveError } = await supabase
