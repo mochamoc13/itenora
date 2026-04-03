@@ -179,9 +179,9 @@ export default async function TripDetailPage({ params }: TripPageProps) {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <ShareTripButton tripId={trip.id} />
-              <DownloadImageButton />
+          <div className="flex flex-wrap gap-3">
+  <ShareTripButton slug={trip.slug} />
+  <DownloadImageButton />
 
               <a
                 href={editHref}
