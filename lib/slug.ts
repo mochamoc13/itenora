@@ -4,24 +4,15 @@ export function makeTripSlug(input: {
   budget?: string;
   people?: string;
 }) {
-  const parts = [
-    input.destination,
-    `${input.days}-day`,
-    input.people || "",
-    input.budget || "",
-    "itinerary",
-  ];
-
-  return parts
-    .join(" ")
+  const destination = input.destination
     .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")   // remove weird chars
     .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+    .replace(/\s+/g, "-");
 
-export function addSlugSuffix(slug: string, suffix: string) {
-  return `${slug}-${suffix.toLowerCase()}`;
+  const people = input.people ? `-${input.people}` : "";
+
+  return `${destination}-${input.days}-day${people}-itinerary`
+    .replace(/-+/g, "-")           // clean double dashes
+    .replace(/^-|-$/g, "");        // trim edges
 }
