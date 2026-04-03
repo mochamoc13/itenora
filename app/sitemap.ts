@@ -1,15 +1,13 @@
 import type { MetadataRoute } from "next";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  // ✅ USE SERVER CLIENT (THIS IS THE FIX)
+  const supabase = createSupabaseServerClient();
 
   const { data: trips, error } = await supabase
     .from("itineraries")
@@ -37,10 +35,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const tripPages: MetadataRoute.Sitemap = (trips ?? [])
-    .filter((trip) => typeof trip.slug === "string" && trip.slug.trim().length > 0)
+    .filter((trip) => trip.slug)
     .map((trip) => ({
       url: `${baseUrl}/trips/share/${trip.slug}`,
-      lastModified: trip.created_at ? new Date(trip.created_at) : new Date(),
+      lastModified: trip.created_at
+        ? new Date(trip.created_at)
+        : new Date(),
       changeFrequency: "weekly" as const,
       priority: 0.7,
     }));
