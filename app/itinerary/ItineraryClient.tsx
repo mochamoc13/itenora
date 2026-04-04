@@ -101,28 +101,36 @@ function getAgodaCityId(destination: string) {
 
 function buildAgodaLink(params: {
   destination: string;
+  area?: string;
   checkIn?: string;
   checkOut?: string;
 }) {
-  const cityId = getAgodaCityId(params.destination);
+  const { destination, area, checkIn, checkOut } = params;
+
+  const cityId = getAgodaCityId(destination);
+  const query = [area, destination].filter(Boolean).join(", ");
 
   const url = new URL("https://www.agoda.com/en-au/search");
 
+  // affiliate
   url.searchParams.set("cid", "1961701");
 
-  if (cityId) {
+  // 🔥 KEY IMPROVEMENT
+  if (area) {
+    // prioritize area search
+    url.searchParams.set("textToSearch", query);
+  } else if (cityId) {
     url.searchParams.set("city", cityId);
   } else {
-    url.searchParams.set("textToSearch", params.destination);
+    url.searchParams.set("textToSearch", destination);
   }
 
-  if (params.checkIn) {
-    url.searchParams.set("checkIn", params.checkIn);
-  }
+  if (checkIn) url.searchParams.set("checkIn", checkIn);
+  if (checkOut) url.searchParams.set("checkOut", checkOut);
 
-  if (params.checkOut) {
-    url.searchParams.set("checkOut", params.checkOut);
-  }
+  // force search behaviour (VERY IMPORTANT)
+  url.searchParams.set("rooms", "1");
+  url.searchParams.set("adults", "2");
 
   return url.toString();
 }
@@ -261,13 +269,18 @@ export default function ItineraryClient() {
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
   const suggestedArea = getSuggestedStayArea(data.input.destination);
-  const hotelLink = buildAgodaLink({
-    destination: data.input.destination,
-    checkIn: data.input.startDate,
-    checkOut: data.input.startDate
-      ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
-      : undefined,
-  });
+  // pick best area from itinerary (first meaningful stop)
+const firstArea =
+  data.itinerary?.[0]?.stops?.find((s) => s.area)?.area;
+
+const hotelLink = buildAgodaLink({
+  destination: data.input.destination,
+  area: firstArea,
+  checkIn: data.input.startDate,
+  checkOut: data.input.startDate
+    ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
+    : undefined,
+});
 
   return (
     <div className="mx-auto max-w-5xl p-6">
