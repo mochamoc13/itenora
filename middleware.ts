@@ -1,16 +1,16 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const isProtectedRoute = createRouteMatcher([
-  "/trips",
-  "/trips/",
-  "/trips/(?!share/).*",
-  "/generate(.*)",
-  "/account(.*)",
-  "/billing(.*)",
-]);
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
+  const { pathname } = req.nextUrl;
+
+  const isProtected =
+    pathname === "/trips" ||
+    pathname.startsWith("/trips/") && !pathname.startsWith("/trips/share/") ||
+    pathname.startsWith("/generate") ||
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/billing");
+
+  if (isProtected) {
     await auth.protect();
   }
 });
