@@ -63,40 +63,9 @@ function gmLink(query: string) {
 function addDays(dateString: string, days: number) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return undefined;
+
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-const agodaCityMap: Record<string, string> = {
-  tokyo: "5085",
-  sydney: "14370",
-  brisbane: "9466",
-  bali: "17193",
-  osaka: "9590",
-  kyoto: "1784",
-  seoul: "14690",
-  adelaide: "11981",
-  auckland: "3750",
-  jakarta: "8691",
-  singapore: "4064",
-  "kuala lumpur": "14524",
-  melbourne: "10372",
-  bangkok: "9395", // ✅ ADD THIS
-};
-
-function getAgodaCityId(destination: string) {
-  const key = destination.trim().toLowerCase();
-
-  if (agodaCityMap[key]) return agodaCityMap[key];
-
-  if (key === "japan") return agodaCityMap["tokyo"];
-  if (key === "indonesia") return agodaCityMap["bali"];
-  if (key === "australia") return agodaCityMap["sydney"];
-  if (key === "south korea" || key === "korea") return agodaCityMap["seoul"];
-
- if (key === "thailand") return agodaCityMap["bangkok"];
-
-  return undefined;
 }
 
 function buildAgodaLink(params: {
@@ -104,33 +73,39 @@ function buildAgodaLink(params: {
   area?: string;
   checkIn?: string;
   checkOut?: string;
+  adults?: number;
+  rooms?: number;
 }) {
-  const { destination, area, checkIn, checkOut } = params;
+  const {
+    destination,
+    area,
+    checkIn,
+    checkOut,
+    adults = 2,
+    rooms = 1,
+  } = params;
 
-  const cityId = getAgodaCityId(destination);
-  const query = [area, destination].filter(Boolean).join(", ");
+  const query = [area, destination].filter(Boolean).join(", ").trim();
+  const finalQuery = query || destination;
 
-  const url = new URL("https://www.agoda.com/en-au/search");
+  const url = new URL("https://www.agoda.com/search");
 
-  // affiliate
+  // Agoda affiliate tracking
   url.searchParams.set("cid", "1961701");
 
-  // 🔥 KEY IMPROVEMENT
-  if (area) {
-    // prioritize area search
-    url.searchParams.set("textToSearch", query);
-  } else if (cityId) {
-    url.searchParams.set("city", cityId);
-  } else {
-    url.searchParams.set("textToSearch", destination);
+  // Most reliable Agoda search input
+  url.searchParams.set("textToSearch", finalQuery);
+
+  if (checkIn) {
+    url.searchParams.set("checkIn", checkIn);
   }
 
-  if (checkIn) url.searchParams.set("checkIn", checkIn);
-  if (checkOut) url.searchParams.set("checkOut", checkOut);
+  if (checkOut) {
+    url.searchParams.set("checkOut", checkOut);
+  }
 
-  // force search behaviour (VERY IMPORTANT)
-  url.searchParams.set("rooms", "1");
-  url.searchParams.set("adults", "2");
+  url.searchParams.set("rooms", String(rooms));
+  url.searchParams.set("adults", String(adults));
 
   return url.toString();
 }
@@ -269,18 +244,18 @@ export default function ItineraryClient() {
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
   const suggestedArea = getSuggestedStayArea(data.input.destination);
-  // pick best area from itinerary (first meaningful stop)
-const firstArea =
-  data.itinerary?.[0]?.stops?.find((s) => s.area)?.area;
 
-const hotelLink = buildAgodaLink({
-  destination: data.input.destination,
-  area: firstArea,
-  checkIn: data.input.startDate,
-  checkOut: data.input.startDate
-    ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
-    : undefined,
-});
+  const firstArea =
+    data.itinerary?.[0]?.stops?.find((s) => s.area)?.area || undefined;
+
+  const hotelLink = buildAgodaLink({
+    destination: data.input.destination,
+    area: firstArea,
+    checkIn: data.input.startDate,
+    checkOut: data.input.startDate
+      ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
+      : undefined,
+  });
 
   return (
     <div className="mx-auto max-w-5xl p-6">
@@ -374,49 +349,58 @@ const hotelLink = buildAgodaLink({
             </div>
 
             <div className="mt-4 divide-y">
-              {day.stops.map((s, idx) => (
-                <div key={idx} className="py-3">
-                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                    <div className="font-medium">
-                      {s.time} — {s.title}
-                      {s.area ? (
-                        <span className="text-neutral-500"> • {s.area}</span>
+              {day.stops.map((s, idx) => {
+                const stopHotelLink = buildAgodaLink({
+                  destination: data.input.destination,
+                  area: s.area,
+                  checkIn: day.date,
+                  checkOut: day.date ? addDays(day.date, 1) : undefined,
+                });
+
+                return (
+                  <div key={idx} className="py-3">
+                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <div className="font-medium">
+                        {s.time} — {s.title}
+                        {s.area ? (
+                          <span className="text-neutral-500"> • {s.area}</span>
+                        ) : null}
+                      </div>
+                      <div className="text-sm text-neutral-600">
+                        ~{s.costEstimate}
+                      </div>
+                    </div>
+
+                    {s.notes ? (
+                      <div className="mt-1 text-sm text-neutral-600">
+                        {s.notes}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-2 flex flex-wrap gap-4">
+                      <a
+                        className="text-sm underline"
+                        href={gmLink(s.mapQuery)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open on Google Maps
+                      </a>
+
+                      {idx === 0 ? (
+                        <a
+                          className="text-sm font-medium text-orange-700 underline"
+                          href={stopHotelLink}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                        >
+                          Check nearby hotels
+                        </a>
                       ) : null}
                     </div>
-                    <div className="text-sm text-neutral-600">
-                      ~{s.costEstimate}
-                    </div>
                   </div>
-
-                  {s.notes ? (
-                    <div className="mt-1 text-sm text-neutral-600">
-                      {s.notes}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-2 flex flex-wrap gap-4">
-                    <a
-                      className="text-sm underline"
-                      href={gmLink(s.mapQuery)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open on Google Maps
-                    </a>
-
-                    {idx === 0 ? (
-                      <a
-                        className="text-sm font-medium text-orange-700 underline"
-                        href={hotelLink}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                      >
-                        Check nearby hotels
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
