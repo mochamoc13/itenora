@@ -4,9 +4,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
+  const baseUrl =
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com").replace(/\/$/, "");
 
-  // ✅ USE SERVER CLIENT (THIS IS THE FIX)
   const supabase = createSupabaseServerClient();
 
   const { data: trips, error } = await supabase
@@ -19,31 +19,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("Sitemap query error:", error);
   }
 
+  const safeTrips = (trips ?? []).filter(
+    (trip) => typeof trip.slug === "string" && trip.slug.trim().length > 0
+  );
+
+  const latestTripDate =
+    safeTrips.length > 0 && safeTrips[0].created_at
+      ? new Date(safeTrips[0].created_at)
+      : new Date();
+
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}/`,
-      lastModified: new Date(),
+      lastModified: latestTripDate,
       changeFrequency: "daily",
       priority: 1,
     },
     {
       url: `${baseUrl}/trips`,
-      lastModified: new Date(),
+      lastModified: latestTripDate,
       changeFrequency: "daily",
       priority: 0.8,
     },
   ];
 
-  const tripPages: MetadataRoute.Sitemap = (trips ?? [])
-    .filter((trip) => trip.slug)
-    .map((trip) => ({
-      url: `${baseUrl}/trips/share/${trip.slug}`,
-      lastModified: trip.created_at
-        ? new Date(trip.created_at)
-        : new Date(),
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    }));
+  const tripPages: MetadataRoute.Sitemap = safeTrips.map((trip) => ({
+    url: `${baseUrl}/trips/share/${trip.slug}`,
+    lastModified: trip.created_at ? new Date(trip.created_at) : latestTripDate,
+    changeFrequency: "weekly",
+    priority: 0.7,
+  }));
 
   return [...staticPages, ...tripPages];
 }

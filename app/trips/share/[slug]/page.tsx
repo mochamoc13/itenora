@@ -24,6 +24,14 @@ function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function cleanStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function getMeaningfulStayArea(stops: any[], destination: string) {
   if (!Array.isArray(stops)) return "";
 
@@ -52,6 +60,61 @@ function getMeaningfulStayArea(stops: any[], destination: string) {
   return "";
 }
 
+function buildFallbackTitle(destination: string, input: any, itinerary: any[]) {
+  const days =
+    typeof input?.days === "number"
+      ? input.days
+      : itinerary.length > 0
+        ? itinerary.length
+        : null;
+
+  const people = cleanText(input?.people);
+  const audience =
+    people === "family"
+      ? " for Families"
+      : people === "couple"
+        ? " for Couples"
+        : people === "solo"
+          ? " for Solo Travellers"
+          : "";
+
+  if (days && destination) {
+    return `${days} Day ${destination} Itinerary${audience} (2026)`;
+  }
+
+  return destination ? `${destination} Itinerary` : "Travel Itinerary";
+}
+
+function buildFallbackDescription(destination: string, input: any) {
+  const days =
+    typeof input?.days === "number" && input.days > 0 ? input.days : null;
+
+  const people = cleanText(input?.people);
+  const audience =
+    people === "family"
+      ? "for families"
+      : people === "couple"
+        ? "for couples"
+        : people === "solo"
+          ? "for solo travellers"
+          : "for travellers";
+
+  if (days && destination) {
+    return `Plan the perfect ${days} day ${destination} itinerary ${audience}. Includes attractions, food spots, and practical day-by-day planning ideas.`;
+  }
+
+  if (destination) {
+    return `Plan your ${destination} itinerary with attractions, food stops, and practical day-by-day planning ideas.`;
+  }
+
+  return "Shared itinerary page on Itenora.";
+}
+
+function getDayHeading(day: any, index: number) {
+  const theme = cleanText(day?.theme);
+  return `Day ${day?.day ?? index + 1}${theme ? ` — ${theme}` : ""}`;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -59,7 +122,7 @@ export async function generateMetadata({
 
   const { data: trip } = await supabase
     .from("itineraries")
-    .select("title, destination, budget, slug")
+    .select("title, destination, slug, generated_plan")
     .eq("slug", params.slug)
     .maybeSingle();
 
@@ -74,27 +137,48 @@ export async function generateMetadata({
     };
   }
 
+  const input = trip.generated_plan?.input ?? {};
+  const itinerary = Array.isArray(trip.generated_plan?.itinerary)
+    ? trip.generated_plan.itinerary
+    : [];
+  const seo = trip.generated_plan?.seo ?? {};
+
+  const destination = cleanText(trip.destination || input.destination || "");
+  const h1 =
+    cleanText(seo.h1) ||
+    cleanText(trip.title) ||
+    buildFallbackTitle(destination, input, itinerary);
+
+  const seoTitle =
+    cleanText(seo.seoTitle) || cleanText(trip.title) || h1;
+
+  const seoDescription =
+    cleanText(seo.seoDescription) ||
+    buildFallbackDescription(destination, input);
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
-  const title = trip.title || `${trip.destination} itinerary`;
-  const description = `This itinerary for ${trip.destination} includes day-by-day suggestions, attractions, food stops, and practical planning ideas to make the trip easier.`;
+  const canonicalUrl = `${siteUrl}/trips/share/${params.slug}`;
+  const pageTitle = seoTitle.includes("| Itenora")
+    ? seoTitle
+    : `${seoTitle} | Itenora`;
 
   return {
-    title: `${title} | Itenora`,
-    description,
+    title: pageTitle,
+    description: seoDescription,
     alternates: {
-      canonical: `${siteUrl}/trips/share/${params.slug}`,
+      canonical: canonicalUrl,
     },
     openGraph: {
-      title: `${title} | Itenora`,
-      description,
-      url: `${siteUrl}/trips/share/${params.slug}`,
+      title: pageTitle,
+      description: seoDescription,
+      url: canonicalUrl,
       siteName: "Itenora",
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | Itenora`,
-      description,
+      title: pageTitle,
+      description: seoDescription,
     },
   };
 }
@@ -127,23 +211,23 @@ export default async function PublicTripPage({ params }: PageProps) {
     );
   }
 
-  const { data: relatedTrips } = await supabase
-    .from("itineraries")
-    .select("slug, title")
-    .eq("destination", trip.destination)
-    .neq("slug", params.slug)
-    .not("slug", "is", null)
-    .limit(5);
-
   const input = trip.generated_plan?.input ?? {};
   const itinerary = Array.isArray(trip.generated_plan?.itinerary)
     ? trip.generated_plan.itinerary
     : [];
+  const seo = trip.generated_plan?.seo ?? {};
 
   const destination = cleanText(trip.destination || input.destination || "");
   const title =
+    cleanText(seo.h1) ||
     cleanText(trip.title) ||
-    `${typeof input.days === "number" ? `${input.days} Day ` : ""}${destination} Itinerary`;
+    buildFallbackTitle(destination, input, itinerary);
+
+  const introParagraph =
+    cleanText(seo.introParagraph) ||
+    `This itinerary for ${destination || "your destination"} includes day-by-day suggestions, attractions, food stops, and practical planning ideas to make the trip easier.`;
+
+  const overviewBullets = cleanStringArray(seo.overviewBullets);
 
   const days =
     typeof input.days === "number"
@@ -171,17 +255,27 @@ export default async function PublicTripPage({ params }: PageProps) {
     checkOut: endDate,
   });
 
+  const { data: relatedTrips } = await supabase
+    .from("itineraries")
+    .select("slug, title, generated_plan")
+    .eq("destination", trip.destination)
+    .neq("slug", params.slug)
+    .not("slug", "is", null)
+    .limit(5);
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
 
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "TravelItinerary",
     name: title,
-    description: `Travel itinerary for ${destination}`,
+    description:
+      cleanText(seo.seoDescription) ||
+      `Travel itinerary for ${destination || "your destination"}`,
     url: `${siteUrl}/trips/share/${params.slug}`,
-    itinerary: itinerary.map((day: any) => ({
+    itinerary: itinerary.map((day: any, index: number) => ({
       "@type": "ListItem",
-      name: `Day ${day.day ?? ""}${day.theme ? ` - ${day.theme}` : ""}`,
+      name: getDayHeading(day, index),
       description: Array.isArray(day.stops)
         ? day.stops
             .map((stop: any) => `${stop.time ?? "Anytime"} ${stop.title ?? "Stop"}`)
@@ -206,14 +300,12 @@ export default async function PublicTripPage({ params }: PageProps) {
           </h1>
 
           <p className="mt-3 text-base leading-7 text-gray-700">
-            This itinerary for {destination || "your destination"} includes
-            day-by-day suggestions, attractions, food stops, and practical
-            planning ideas to make the trip easier.
+            {introParagraph}
           </p>
 
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Use this itinerary as a flexible travel guide for what to do, where
-            to go, and how to organise each day more smoothly.
+            Updated for 2026 travel. Use this itinerary as a flexible travel guide
+            for what to do, where to go, and how to organise each day more smoothly.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
@@ -237,10 +329,26 @@ export default async function PublicTripPage({ params }: PageProps) {
           </div>
         </header>
 
+        {overviewBullets.length > 0 ? (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {destination ? `${destination} itinerary overview` : "Itinerary overview"}
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+              {overviewBullets.map((item, index) => (
+                <li key={index} className="flex gap-2">
+                  <span className="mt-1 text-gray-400">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm font-medium text-amber-900">
-            Tip: Open maps, hotel, or activity links in a new tab so your
-            itinerary stays open.
+            Tip: Open maps, hotel, or activity links in a new tab so your itinerary
+            stays open.
           </p>
           <p className="mt-1 text-xs text-amber-800">
             This is especially helpful if you opened the trip from Instagram or Facebook.
@@ -253,8 +361,8 @@ export default async function PublicTripPage({ params }: PageProps) {
               Stay recommendation
             </h2>
             <p className="mt-2 text-sm text-orange-800">
-              Compare hotel options for this trip based on the destination
-              {hasValidStartDate ? " and dates" : ""} in the itinerary.
+              Find the best hotel deals for this itinerary based on the destination
+              {hasValidStartDate ? " and dates" : ""}.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -317,8 +425,7 @@ export default async function PublicTripPage({ params }: PageProps) {
                 <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-semibold text-gray-900">
-                      Day {day.day ?? index + 1}
-                      {day.theme ? ` — ${day.theme}` : ""}
+                      {getDayHeading(day, index)}
                     </h2>
 
                     {day.date ? (
@@ -488,16 +595,24 @@ export default async function PublicTripPage({ params }: PageProps) {
             </h2>
 
             <ul className="space-y-2">
-              {relatedTrips.map((r: any) => (
-                <li key={r.slug}>
-                  <Link
-                    href={`/trips/share/${r.slug}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {r.title}
-                  </Link>
-                </li>
-              ))}
+              {relatedTrips.map((r: any) => {
+                const relatedSeo = r.generated_plan?.seo ?? {};
+                const relatedTitle =
+                  cleanText(relatedSeo.h1) ||
+                  cleanText(r.title) ||
+                  "Related itinerary";
+
+                return (
+                  <li key={r.slug}>
+                    <Link
+                      href={`/trips/share/${r.slug}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {relatedTitle}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ) : null}

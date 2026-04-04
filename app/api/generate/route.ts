@@ -60,6 +60,11 @@ type StopWithInternalTime = StopWithTime & {
 };
 
 type ParsedAiItinerary = {
+  seoTitle?: string;
+  seoDescription?: string;
+  h1?: string;
+  introParagraph?: string;
+  overviewBullets?: string[];
   itinerary?: Array<{
     day?: number;
     date?: string | null;
@@ -155,6 +160,65 @@ function sanitizeStringArray(value: unknown): string[] {
     .map((v) => v.trim())
     .filter(Boolean)
     .slice(0, 12);
+}
+
+function sanitizeOverviewBullets(value: unknown, max = 7): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function titleCaseWords(input: string) {
+  return input
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function buildAudienceLabel(people: PeopleType, childAges: ChildAges) {
+  if (people === "family" || childAges !== "none") return "for Families";
+  if (people === "couple") return "for Couples";
+  return "for Solo Travellers";
+}
+
+function buildSeoH1(safe: SafeRequest) {
+  const audience = buildAudienceLabel(safe.people, safe.childAges);
+  return `${safe.days} Day ${titleCaseWords(safe.destination)} Itinerary ${audience} (2026)`;
+}
+
+function buildSeoTitle(safe: SafeRequest) {
+  return `${buildSeoH1(safe)} | Itenora`;
+}
+
+function buildSeoDescription(safe: SafeRequest) {
+  const audience =
+    safe.people === "family"
+      ? "for families"
+      : safe.people === "couple"
+        ? "for couples"
+        : "for solo travellers";
+
+  const interests =
+    safe.interests.length > 0
+      ? safe.interests.slice(0, 3).join(", ")
+      : "top attractions, food spots, and practical planning tips";
+
+  return `Plan the perfect ${safe.days} day ${safe.destination} itinerary ${audience}. Includes ${interests} with a day-by-day travel plan.`;
+}
+
+function buildFallbackIntroParagraph(safe: SafeRequest) {
+  const audience =
+    safe.people === "family"
+      ? "families"
+      : safe.people === "couple"
+        ? "couples"
+        : "solo travellers";
+
+  return `This ${safe.days} day ${safe.destination} itinerary is designed for ${audience} who want a smoother trip with day-by-day suggestions, attractions, food stops, and practical planning ideas.`;
 }
 
 function getStopsForPace(pace: Pace) {
@@ -510,6 +574,11 @@ Do not include text before or after the JSON.
 Return exactly this object shape:
 
 {
+  "seoTitle": "string",
+  "seoDescription": "string",
+  "h1": "string",
+  "introParagraph": "string",
+  "overviewBullets": ["string"],
   "itinerary": [
     {
       "day": 1,
@@ -532,12 +601,17 @@ Return exactly this object shape:
 
 Rules:
 - Top-level must be an object.
-- The object must contain only the key "itinerary".
+- The object may contain only these keys: seoTitle, seoDescription, h1, introParagraph, overviewBullets, itinerary.
 - itinerary must be an array.
+- overviewBullets must be an array of short strings.
 - dailyCostEstimate must equal the sum of costEstimate values.
 - Keep notes short and useful.
 - area should be short.
 - mapQuery should be concise.
+- seoTitle should sound natural and search-friendly.
+- seoDescription should be under 160 characters where possible.
+- h1 should be human-friendly and SEO-friendly.
+- Do not use vague labels like "mid", "balanced", "packed", or "hotel-ready" in seoTitle or h1.
 `;
 
 async function callModel(params: {
@@ -555,7 +629,6 @@ async function callModel(params: {
   });
 
   const content = completion.choices[0]?.message?.content;
-
   const text = typeof content === "string" ? content.trim() : "";
 
   if (!text) {
@@ -657,6 +730,24 @@ Strict rules:
 - Include at least 1 kid-appropriate stop per day when kids age group != none.
 - Keep notes short.
 
+SEO requirements:
+- Also create SEO-friendly fields for the whole trip.
+- seoTitle should target a phrase a real person might search for.
+- h1 should be clear and natural.
+- introParagraph should be 2 to 3 sentences and naturally mention the destination, trip length, and traveller type.
+- overviewBullets should summarise the days in short bullet form.
+- Avoid weak titles like:
+  - "${safe.days}-day ${safe.destination} (${safe.budget})"
+  - "mid"
+  - "balanced"
+  - "packed"
+  - "hotel-ready"
+- Prefer titles like:
+  - "3 Day Singapore Itinerary for Families (2026)"
+  - "7 Day Tokyo Itinerary for First-Time Visitors (2026)"
+  - "5 Day Bali Itinerary for Couples (2026)"
+- Use specific place names where relevant.
+
 Special city guidance:
 - If the destination is Sydney, spread days across clearly different areas such as Circular Quay/The Rocks, Darling Harbour, Bondi/Eastern Beaches, Manly/Northern Beaches, Surry Hills/City, Inner West/Newtown, and sensible nearby day trips.
 - If the destination is a major city, spread days across distinct neighborhoods and iconic nearby areas.
@@ -672,12 +763,12 @@ async function generateChunk(params: {
   stopsPerDay: number;
   usedTitles: string[];
   usedAreas: string[];
-}): Promise<ChunkResult> {
+}): Promise<ParsedAiItinerary> {
   const prompt = buildChunkPrompt(params);
 
   const parsed = await callModel({
     prompt,
-    maxTokens: 2200,
+    maxTokens: 2600,
   });
 
   const chunk = Array.isArray(parsed.itinerary)
@@ -688,7 +779,10 @@ async function generateChunk(params: {
     throw new Error(`Chunk ${params.chunkIndex + 1} returned no days`);
   }
 
-  return chunk;
+  return {
+    ...parsed,
+    itinerary: chunk,
+  };
 }
 
 export async function POST(req: Request) {
@@ -788,7 +882,7 @@ export async function POST(req: Request) {
       chunkIndex: number;
       chunkDates: string[];
       chunkDays: number;
-      chunk: ChunkResult;
+      parsed: ParsedAiItinerary;
     }> = [];
 
     const usedTitles: string[] = [];
@@ -801,7 +895,7 @@ export async function POST(req: Request) {
           ? chunkDates.length
           : Math.min(chunkSize, safe.days - chunkIndex * chunkSize);
 
-      const chunk = await generateChunk({
+      const parsedChunk = await generateChunk({
         safe,
         chunkIndex,
         chunkCount,
@@ -811,6 +905,10 @@ export async function POST(req: Request) {
         usedTitles: [...usedTitles],
         usedAreas: [...usedAreas],
       });
+
+      const chunk = Array.isArray(parsedChunk.itinerary)
+        ? parsedChunk.itinerary
+        : [];
 
       for (const day of chunk) {
         if (Array.isArray(day.stops)) {
@@ -829,7 +927,7 @@ export async function POST(req: Request) {
         chunkIndex,
         chunkDates,
         chunkDays,
-        chunk,
+        parsed: parsedChunk,
       });
     }
 
@@ -839,7 +937,9 @@ export async function POST(req: Request) {
     let globalDayNumber = 1;
 
     for (const resolved of resolvedChunks) {
-      const chunkItinerary = resolved.chunk.slice(0, resolved.chunkDays);
+      const chunkItinerary = Array.isArray(resolved.parsed.itinerary)
+        ? resolved.parsed.itinerary.slice(0, resolved.chunkDays)
+        : [];
 
       for (let i = 0; i < chunkItinerary.length; i++) {
         const item = chunkItinerary[i];
@@ -911,8 +1011,48 @@ export async function POST(req: Request) {
         };
       });
 
+    const seoSource = resolvedChunks[0]?.parsed;
+
+    const seoTitle =
+      typeof seoSource?.seoTitle === "string" && seoSource.seoTitle.trim()
+        ? seoSource.seoTitle.trim()
+        : buildSeoTitle(safe);
+
+    const seoDescription =
+      typeof seoSource?.seoDescription === "string" &&
+      seoSource.seoDescription.trim()
+        ? seoSource.seoDescription.trim()
+        : buildSeoDescription(safe);
+
+    const h1 =
+      typeof seoSource?.h1 === "string" && seoSource.h1.trim()
+        ? seoSource.h1.trim()
+        : buildSeoH1(safe);
+
+    const introParagraph =
+      typeof seoSource?.introParagraph === "string" &&
+      seoSource.introParagraph.trim()
+        ? seoSource.introParagraph.trim()
+        : buildFallbackIntroParagraph(safe);
+
+    const overviewBulletsFromAi = sanitizeOverviewBullets(
+      seoSource?.overviewBullets
+    );
+
+    const overviewBullets =
+      overviewBulletsFromAi.length > 0
+        ? overviewBulletsFromAi
+        : itinerary.map((day) => `Day ${day.day}: ${day.theme}`);
+
     const responseBody = {
       input: safe,
+      seo: {
+        seoTitle,
+        seoDescription,
+        h1,
+        introParagraph,
+        overviewBullets,
+      },
       itinerary,
       meta: {
         generatedAt: new Date().toISOString(),
@@ -921,7 +1061,7 @@ export async function POST(req: Request) {
       },
     };
 
-    const tripTitle = `${safe.days}-day ${safe.destination} (${safe.budget})`;
+    const tripTitle = h1;
 
     const baseSlug = makeTripSlug({
       destination: safe.destination,
@@ -991,7 +1131,7 @@ export async function POST(req: Request) {
       departTime: safe.departTime ?? "",
       childAges: safe.childAges ?? "none",
       interests: safe.interests,
-      source: "generate_api_openai_gpt5_chunked",
+      source: "generate_api_openai_gpt4omini_chunked_with_seo",
       savedTripId: savedTrip.id,
       clerkUserId: userId,
       plan: usage.plan,
