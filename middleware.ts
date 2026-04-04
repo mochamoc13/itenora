@@ -1,23 +1,26 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/coming-soon(.*)",
+  "/api/stripe/webhook(.*)",
+  "/api/stripe/session(.*)",
+  "/sitemap.xml",
+  "/robots.txt",
+  "/trips/share(.*)",
+]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { pathname } = req.nextUrl;
-
-  const isProtected =
-    pathname === "/trips" ||
-    pathname.startsWith("/trips/") && !pathname.startsWith("/trips/share/") ||
-    pathname.startsWith("/generate") ||
-    pathname.startsWith("/account") ||
-    pathname.startsWith("/billing");
-
-  if (isProtected) {
+  if (!isPublicRoute(req)) {
     await auth.protect();
   }
 });
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml|txt)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 };
