@@ -8,10 +8,6 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-
-      // ❌ REMOVE this:
-      // disallow: "/trips",
-
       disallow: [
         "/api",
         "/sign-in",
