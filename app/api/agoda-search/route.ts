@@ -17,9 +17,13 @@ type AgodaResult = {
   reviewScore?: number;
   dailyRate?: number;
   starRating?: number;
+  cityName?: string;
   [key: string]: unknown;
 };
 
+// IMPORTANT:
+// These are placeholders until you confirm Agoda's official city IDs
+// from their hotel/city data file in the Agoda partner portal.
 const AGODA_CITY_MAP: Record<string, number> = {
   tokyo: 5085,
   osaka: 9590,
@@ -45,7 +49,22 @@ function getCityId(destination?: string): number | null {
   const key = normalize(destination);
 
   if (!key) return null;
-  if (AGODA_CITY_MAP[key]) return AGODA_CITY_MAP[key];
+
+  // safer matching for values like "Tokyo, Japan"
+  if (key.includes("tokyo")) return AGODA_CITY_MAP["tokyo"];
+  if (key.includes("osaka")) return AGODA_CITY_MAP["osaka"];
+  if (key.includes("kyoto")) return AGODA_CITY_MAP["kyoto"];
+  if (key.includes("singapore")) return AGODA_CITY_MAP["singapore"];
+  if (key.includes("bangkok")) return AGODA_CITY_MAP["bangkok"];
+  if (key.includes("seoul")) return AGODA_CITY_MAP["seoul"];
+  if (key.includes("bali")) return AGODA_CITY_MAP["bali"];
+  if (key.includes("jakarta")) return AGODA_CITY_MAP["jakarta"];
+  if (key.includes("sydney")) return AGODA_CITY_MAP["sydney"];
+  if (key.includes("melbourne")) return AGODA_CITY_MAP["melbourne"];
+  if (key.includes("brisbane")) return AGODA_CITY_MAP["brisbane"];
+  if (key.includes("auckland")) return AGODA_CITY_MAP["auckland"];
+  if (key.includes("kuala lumpur")) return AGODA_CITY_MAP["kuala lumpur"];
+  if (key.includes("adelaide")) return AGODA_CITY_MAP["adelaide"];
 
   if (key === "japan") return AGODA_CITY_MAP["tokyo"];
   if (key === "indonesia") return AGODA_CITY_MAP["bali"];
@@ -145,6 +164,10 @@ async function searchAgoda(params: AgodaSearchParams) {
 
   const cityId = getCityId(destination);
 
+  console.log("Agoda destination:", destination);
+  console.log("Agoda area:", area);
+  console.log("Agoda mapped cityId:", cityId);
+
   if (!cityId) {
     return {
       ok: false,
@@ -178,6 +201,8 @@ async function searchAgoda(params: AgodaSearchParams) {
     },
   };
 
+  console.log("Agoda request payload:", JSON.stringify(payload));
+
   const response = await fetch(
     "http://affiliateapi7643.agoda.com/affiliateservice/lt_v1",
     {
@@ -195,6 +220,9 @@ async function searchAgoda(params: AgodaSearchParams) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    console.error("Agoda API error status:", response.status);
+    console.error("Agoda API error body:", data);
+
     return {
       ok: false,
       status: 502,
@@ -208,6 +236,9 @@ async function searchAgoda(params: AgodaSearchParams) {
 
   const results: AgodaResult[] = Array.isArray(data?.results) ? data.results : [];
   const best = results[0];
+
+  console.log("Agoda first result:", best);
+  console.log("Agoda results count:", results.length);
 
   if (!best?.landingURL) {
     return {
@@ -285,7 +316,6 @@ export async function GET(req: Request) {
     return NextResponse.redirect(targetUrl, 302);
   } catch (error) {
     console.error("Agoda GET route error:", error);
-
     return NextResponse.redirect("https://www.agoda.com/search", 302);
   }
 }
