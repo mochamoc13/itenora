@@ -116,15 +116,14 @@ function getDayHeading(day: any, index: number) {
 
 function buildAgodaApiLink(params: {
   destination?: string;
-  area?: string;
   checkIn?: string;
   checkOut?: string;
   adults?: number;
 }) {
-  const url = new URL("/api/agoda-search", "https://itenora.com");
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
+  const url = new URL("/api/agoda-search", baseUrl);
 
   if (params.destination) url.searchParams.set("destination", params.destination);
-  if (params.area) url.searchParams.set("area", params.area);
   if (params.checkIn) url.searchParams.set("checkIn", params.checkIn);
   if (params.checkOut) url.searchParams.set("checkOut", params.checkOut);
   url.searchParams.set("adults", String(params.adults ?? 2));
@@ -424,7 +423,6 @@ export default async function PublicTripPage({ params }: PageProps) {
 
             const dayHotelLink = buildAgodaApiLink({
               destination,
-              area: meaningfulArea || undefined,
               checkIn,
               checkOut,
               adults,

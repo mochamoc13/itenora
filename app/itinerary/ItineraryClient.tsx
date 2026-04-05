@@ -70,31 +70,16 @@ function addDays(dateString: string, days: number) {
 
 function buildAgodaLink(params: {
   destination: string;
-  area?: string;
   checkIn?: string;
   checkOut?: string;
   adults?: number;
-  rooms?: number;
 }) {
-  const {
-    destination,
-    area,
-    checkIn,
-    checkOut,
-    adults = 2,
-    rooms = 1,
-  } = params;
+  const { destination, checkIn, checkOut, adults = 2 } = params;
 
-  const query = [area, destination].filter(Boolean).join(", ").trim();
-  const finalQuery = query || destination;
+  const url = new URL("/api/agoda-search", window.location.origin);
 
-  const url = new URL("https://www.agoda.com/search");
-
-  // Agoda affiliate tracking
-  url.searchParams.set("cid", "1961701");
-
-  // Most reliable Agoda search input
-  url.searchParams.set("textToSearch", finalQuery);
+  url.searchParams.set("destination", destination);
+  url.searchParams.set("adults", String(adults));
 
   if (checkIn) {
     url.searchParams.set("checkIn", checkIn);
@@ -103,9 +88,6 @@ function buildAgodaLink(params: {
   if (checkOut) {
     url.searchParams.set("checkOut", checkOut);
   }
-
-  url.searchParams.set("rooms", String(rooms));
-  url.searchParams.set("adults", String(adults));
 
   return url.toString();
 }
@@ -126,6 +108,7 @@ function getSuggestedStayArea(destination: string) {
   if (d.includes("jakarta")) return "Central Jakarta or Sudirman";
   if (d.includes("auckland")) return "CBD or Viaduct Harbour";
   if (d.includes("kuala lumpur")) return "Bukit Bintang or KLCC";
+  if (d.includes("gold coast")) return "Surfers Paradise or Main Beach";
 
   return `central ${destination}`;
 }
@@ -245,16 +228,16 @@ export default function ItineraryClient() {
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
   const suggestedArea = getSuggestedStayArea(data.input.destination);
 
-  const firstArea =
-    data.itinerary?.[0]?.stops?.find((s) => s.area)?.area || undefined;
+  const adults =
+    data.input.people === "solo" ? 1 : data.input.people === "couple" ? 2 : 2;
 
   const hotelLink = buildAgodaLink({
     destination: data.input.destination,
-    area: firstArea,
     checkIn: data.input.startDate,
     checkOut: data.input.startDate
       ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
       : undefined,
+    adults,
   });
 
   return (
@@ -352,9 +335,9 @@ export default function ItineraryClient() {
               {day.stops.map((s, idx) => {
                 const stopHotelLink = buildAgodaLink({
                   destination: data.input.destination,
-                  area: s.area,
                   checkIn: day.date,
                   checkOut: day.date ? addDays(day.date, 1) : undefined,
+                  adults,
                 });
 
                 return (
