@@ -80,29 +80,30 @@ function isValidDateString(value?: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function buildFallbackAgodaUrl(params: {
+function buildFallbackAgodaUrl({
+  destination,
+  checkIn,
+  checkOut,
+  adults,
+}: {
   destination?: string;
-  area?: string;
   checkIn?: string;
   checkOut?: string;
   adults?: number;
 }) {
-  const { destination, area, checkIn, checkOut, adults = 2 } = params;
+  const url = new URL("https://www.agoda.com/en-au/search");
 
-  const query = [area, destination].filter(Boolean).join(", ").trim();
-  const finalQuery = query || destination || "";
+  // affiliate ID
+  url.searchParams.set("cid", process.env.NEXT_PUBLIC_AGODA_SITE_ID || "1961701");
 
-  const url = new URL("https://www.agoda.com/search");
+  // IMPORTANT: use 'text' NOT 'city'
+  url.searchParams.set("text", destination || "");
 
-  if (finalQuery) {
-    url.searchParams.set("textToSearch", finalQuery);
-  }
+  if (checkIn) url.searchParams.set("checkin", checkIn);
+  if (checkOut) url.searchParams.set("checkout", checkOut);
 
-  if (checkIn) url.searchParams.set("checkIn", checkIn);
-  if (checkOut) url.searchParams.set("checkOut", checkOut);
-
+  url.searchParams.set("adults", String(adults || 2));
   url.searchParams.set("rooms", "1");
-  url.searchParams.set("adults", String(adults));
 
   return url.toString();
 }
@@ -125,6 +126,7 @@ async function searchAgoda(params: AgodaSearchParams) {
     checkOut,
     adults,
   });
+
 
   if (!destination || !checkIn || !checkOut) {
     return {
