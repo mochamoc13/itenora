@@ -292,6 +292,7 @@ export async function GET(req: Request) {
     const checkIn = searchParams.get("checkIn") || undefined;
     const checkOut = searchParams.get("checkOut") || undefined;
     const adults = Number(searchParams.get("adults") || "2") || 2;
+    const debug = searchParams.get("debug") === "1";
 
     const result = await searchAgoda({
       destination,
@@ -300,6 +301,20 @@ export async function GET(req: Request) {
       checkOut,
       adults,
     });
+
+    if (debug) {
+      return NextResponse.json(
+        {
+          destination,
+          area,
+          checkIn,
+          checkOut,
+          adults,
+          result,
+        },
+        { status: 200 }
+      );
+    }
 
     const targetUrl =
       result.ok && typeof result.body.url === "string"
