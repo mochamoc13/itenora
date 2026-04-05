@@ -3,7 +3,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import {
   addDays,
-  buildHotelAffiliateLink,
   buildBookingAffiliateLink,
   buildKlookActivityLink,
   isBookableActivity,
@@ -115,6 +114,24 @@ function getDayHeading(day: any, index: number) {
   return `Day ${day?.day ?? index + 1}${theme ? ` — ${theme}` : ""}`;
 }
 
+function buildAgodaApiLink(params: {
+  destination?: string;
+  area?: string;
+  checkIn?: string;
+  checkOut?: string;
+  adults?: number;
+}) {
+  const url = new URL("/api/agoda-search", "https://itenora.com");
+
+  if (params.destination) url.searchParams.set("destination", params.destination);
+  if (params.area) url.searchParams.set("area", params.area);
+  if (params.checkIn) url.searchParams.set("checkIn", params.checkIn);
+  if (params.checkOut) url.searchParams.set("checkOut", params.checkOut);
+  url.searchParams.set("adults", String(params.adults ?? 2));
+
+  return url.toString();
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -149,9 +166,7 @@ export async function generateMetadata({
     cleanText(trip.title) ||
     buildFallbackTitle(destination, input, itinerary);
 
-  const seoTitle =
-    cleanText(seo.seoTitle) || cleanText(trip.title) || h1;
-
+  const seoTitle = cleanText(seo.seoTitle) || cleanText(trip.title) || h1;
   const seoDescription =
     cleanText(seo.seoDescription) ||
     buildFallbackDescription(destination, input);
@@ -236,6 +251,9 @@ export default async function PublicTripPage({ params }: PageProps) {
         ? itinerary.length
         : null;
 
+  const people = cleanText(input.people);
+  const adults = people === "solo" ? 1 : people === "couple" ? 2 : 2;
+
   const startDate = trip.start_date ?? input.startDate ?? undefined;
   const hasValidStartDate = isValidDateString(startDate);
 
@@ -249,10 +267,11 @@ export default async function PublicTripPage({ params }: PageProps) {
     checkOut: endDate,
   });
 
-  const hotelLink = buildHotelAffiliateLink({
+  const hotelLink = buildAgodaApiLink({
     destination,
     checkIn: startDate,
     checkOut: endDate,
+    adults,
   });
 
   const { data: relatedTrips } = await supabase
@@ -403,11 +422,12 @@ export default async function PublicTripPage({ params }: PageProps) {
                 ? addDays(startDate, index + 1)
                 : undefined;
 
-            const dayHotelLink = buildHotelAffiliateLink({
+            const dayHotelLink = buildAgodaApiLink({
               destination,
               area: meaningfulArea || undefined,
               checkIn,
               checkOut,
+              adults,
             });
 
             const dayBookingLink = buildBookingAffiliateLink({
