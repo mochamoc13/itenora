@@ -199,9 +199,11 @@ export default function PlannerCard() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          destination: destinationData.label,
-          city: destinationData.city,
-          country: destinationData.country,
+         destination: destinationData.label,
+city: destinationData.city,
+country: destinationData.country,
+area: destinationData.label, // 🔥 ADD THIS
+
           lat: destinationData.lat,
           lng: destinationData.lng,
           days: safeDays,
@@ -249,6 +251,11 @@ export default function PlannerCard() {
 
 if (data.savedTrip?.slug) {
   router.push(`/trips/share/${data.savedTrip.slug}`);
+  return;
+}
+
+if (data.savedTrip?.id) {
+  router.push("/itinerary");
   return;
 }
 

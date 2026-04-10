@@ -11,7 +11,7 @@ import {
   buildBookingAffiliateLink,
   buildKlookActivityLink,
   isBookableActivity,
-  isTopAttraction, // 👈 ADD THIS
+  isTopAttraction,
   addDays,
 } from "@/lib/affiliate";
 
@@ -29,6 +29,51 @@ function isValidDateString(value?: string | null) {
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getCountryFromDestination(destination: string) {
+  const cleaned = cleanText(destination);
+
+  const parts = cleaned
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return parts[parts.length - 1];
+  }
+
+  const d = cleaned.toLowerCase();
+
+  if (d.includes("tokyo") || d.includes("osaka") || d.includes("kyoto")) {
+    return "Japan";
+  }
+
+  if (d.includes("singapore")) return "Singapore";
+
+  if (
+    d.includes("sydney") ||
+    d.includes("melbourne") ||
+    d.includes("brisbane") ||
+    d.includes("gold coast")
+  ) {
+    return "Australia";
+  }
+
+  if (d.includes("seoul") || d.includes("busan") || d.includes("jeju")) {
+    return "South Korea";
+  }
+
+  if (d.includes("bangkok")) return "Thailand";
+
+  if (d.includes("bali") || d.includes("jakarta")) {
+    return "Indonesia";
+  }
+
+  if (d.includes("auckland")) return "New Zealand";
+  if (d.includes("kuala lumpur")) return "Malaysia";
+
+  return "";
 }
 
 function getMeaningfulStayArea(stops: any[], destination: string) {
@@ -103,6 +148,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
   const editHref = `/?${editParams.toString()}#planner`;
   const tripDestination = cleanText(trip.destination);
+  const tripCountry = getCountryFromDestination(tripDestination);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -179,9 +225,9 @@ export default async function TripDetailPage({ params }: TripPageProps) {
               </div>
             </div>
 
-          <div className="flex flex-wrap gap-3">
-  <ShareTripButton slug={trip.slug} />
-  <DownloadImageButton />
+            <div className="flex flex-wrap gap-3">
+              <ShareTripButton tripId={trip.id} />
+              <DownloadImageButton />
 
               <a
                 href={editHref}
@@ -215,8 +261,10 @@ export default async function TripDetailPage({ params }: TripPageProps) {
         <div className="space-y-8">
           {itinerary.map((day: any, dayIndex: number) => {
             const dayStops = Array.isArray(day.stops) ? day.stops : [];
-            const meaningfulArea = getMeaningfulStayArea(dayStops, tripDestination);
-            const displayArea = meaningfulArea || tripDestination;
+            const meaningfulArea = getMeaningfulStayArea(
+              dayStops,
+              tripDestination
+            );
             const showHotelBox = Boolean(tripDestination);
 
             const checkIn =
@@ -232,6 +280,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             const hotelLink = buildHotelAffiliateLink({
               destination: tripDestination,
               area: meaningfulArea || undefined,
+              country: tripCountry || undefined,
               checkIn,
               checkOut,
             });
@@ -265,50 +314,37 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                   </div>
                 </div>
 
-                {showHotelBox ? (
-                  <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
-                    <p className="text-sm font-semibold text-orange-900">
-                      Stay recommendation
-                    </p>
+               {showHotelBox ? (
+  <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+    <p className="text-sm font-semibold text-orange-900">
+      Stay recommendation
+    </p>
 
-                    <p className="mt-1 text-sm text-orange-800">
-                      {meaningfulArea ? (
-                        <>
-                          Staying in{" "}
-                          <span className="font-semibold">{displayArea}</span> is
-                          a good fit for this day’s plan.
-                        </>
-                      ) : (
-                        <>
-                          View hotel options in{" "}
-                          <span className="font-semibold">{tripDestination}</span>.
-                        </>
-                      )}
-                    </p>
+    <p className="mt-1 text-sm text-orange-800">
+      Browse hotel options for this part of the trip on Agoda.
+    </p>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={hotelLink}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="inline-flex rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-                      >
-                        {meaningfulArea
-                          ? `Find hotels in ${displayArea}`
-                          : `Find hotels in ${tripDestination}`}
-                      </a>
+    <div className="mt-3 flex flex-wrap gap-2">
+      <a
+        href={bookingLink}
+        target="_blank"
+        rel="noopener noreferrer sponsored"
+        className="inline-flex rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+      >
+        Compare prices on Booking.com
+      </a>
 
-                 <a
-  href={bookingLink}
-  target="_blank"
-  rel="noopener noreferrer sponsored"
-  className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
->
-  Compare prices on Booking.com
-</a>
-                    </div>
-                  </div>
-                ) : null}
+      <a
+        href={hotelLink}
+        target="_blank"
+        rel="noopener noreferrer sponsored"
+        className="inline-flex rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
+      >
+        Check hotels on Agoda
+      </a>
+    </div>
+  </div>
+) : null}
 
                 <div className="space-y-4">
                   {dayStops.map((stop: any, index: number) => (
@@ -323,11 +359,11 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                             {stop.area ? ` • ${stop.area}` : ""}
                           </div>
 
-{isTopAttraction(stop.title) && (
-  <div className="text-xs font-semibold text-red-500 mb-1">
-    🔥 Top attraction
-  </div>
-)}
+                          {isTopAttraction(stop.title) && (
+                            <div className="mb-1 text-xs font-semibold text-red-500">
+                              🔥 Top attraction
+                            </div>
+                          )}
 
                           <h3 className="mt-1 text-lg font-semibold text-gray-900">
                             {stop.title || "Stop"}
@@ -358,22 +394,25 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                           Open on Google Maps
                         </a>
 
-                  {isBookableActivity(stop.title) && (
-  <a
-    href={buildKlookActivityLink(stop.title, trip.destination)}
-    target="_blank"
-    rel="noopener noreferrer sponsored"
-    className={`inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition ${
-      isTopAttraction(stop.title)
-        ? "bg-red-500 text-white hover:bg-red-600"
-        : "bg-orange-100 text-orange-700 hover:bg-orange-200"
-    }`}
-  >
-    {isTopAttraction(stop.title)
-      ? "🔥 Most popular — check price"
-      : "Check price on Klook"}
-  </a>
-)}
+                        {isBookableActivity(stop.title) && (
+                          <a
+                            href={buildKlookActivityLink(
+                              stop.title,
+                              trip.destination
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer sponsored"
+                            className={`inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition ${
+                              isTopAttraction(stop.title)
+                                ? "bg-red-500 text-white hover:bg-red-600"
+                                : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                            }`}
+                          >
+                            {isTopAttraction(stop.title)
+                              ? "🔥 Most popular — check price"
+                              : "Check price on Klook"}
+                          </a>
+                        )}
 
                         <span className="w-full text-xs text-gray-500">
                           Opens in a new tab so you can keep this itinerary open.

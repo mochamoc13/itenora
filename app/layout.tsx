@@ -1,5 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
+import Script from "next/script";
 import type { Metadata } from "next";
 
 import AccountBillingArea from "@/components/AccountBillingArea";
@@ -122,6 +123,17 @@ export default function RootLayout({
           </header>
 
           <main>{children}</main>
+
+          <Script id="travelpayouts-drive" strategy="afterInteractive">
+            {`
+              (function () {
+                var script = document.createElement("script");
+                script.async = 1;
+                script.src = "https://tp-em.com/NTE2NzIx.js?t=516721";
+                document.head.appendChild(script);
+              })();
+            `}
+          </Script>
         </body>
       </html>
     </ClerkProvider>

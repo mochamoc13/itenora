@@ -70,16 +70,33 @@ function addDays(dateString: string, days: number) {
 
 function buildAgodaLink(params: {
   destination: string;
+  area?: string;
+  country?: string;
   checkIn?: string;
   checkOut?: string;
   adults?: number;
 }) {
-  const { destination, checkIn, checkOut, adults = 2 } = params;
+  const {
+    destination,
+    area,
+    country,
+    checkIn,
+    checkOut,
+    adults = 2,
+  } = params;
 
   const url = new URL("/api/agoda-search", window.location.origin);
 
   url.searchParams.set("destination", destination);
   url.searchParams.set("adults", String(adults));
+
+  if (area) {
+    url.searchParams.set("area", area);
+  }
+
+  if (country) {
+    url.searchParams.set("country", country);
+  }
 
   if (checkIn) {
     url.searchParams.set("checkIn", checkIn);
@@ -111,6 +128,58 @@ function getSuggestedStayArea(destination: string) {
   if (d.includes("gold coast")) return "Surfers Paradise or Main Beach";
 
   return `central ${destination}`;
+}
+
+function getCountryFromDestination(destination: string) {
+  const parts = destination
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return parts[parts.length - 1];
+  }
+
+  const d = destination.toLowerCase();
+
+  if (d.includes("tokyo") || d.includes("osaka") || d.includes("kyoto")) {
+    return "Japan";
+  }
+
+  if (d.includes("singapore")) {
+    return "Singapore";
+  }
+
+  if (
+    d.includes("sydney") ||
+    d.includes("melbourne") ||
+    d.includes("brisbane") ||
+    d.includes("gold coast")
+  ) {
+    return "Australia";
+  }
+
+  if (d.includes("seoul") || d.includes("busan") || d.includes("jeju")) {
+    return "South Korea";
+  }
+
+  if (d.includes("bangkok")) {
+    return "Thailand";
+  }
+
+  if (d.includes("bali") || d.includes("jakarta")) {
+    return "Indonesia";
+  }
+
+  if (d.includes("auckland")) {
+    return "New Zealand";
+  }
+
+  if (d.includes("kuala lumpur")) {
+    return "Malaysia";
+  }
+
+  return undefined;
 }
 
 export default function ItineraryClient() {
@@ -227,12 +296,15 @@ export default function ItineraryClient() {
 
   const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
   const suggestedArea = getSuggestedStayArea(data.input.destination);
+  const country = getCountryFromDestination(data.input.destination);
 
   const adults =
     data.input.people === "solo" ? 1 : data.input.people === "couple" ? 2 : 2;
 
   const hotelLink = buildAgodaLink({
     destination: data.input.destination,
+    area: suggestedArea,
+    country,
     checkIn: data.input.startDate,
     checkOut: data.input.startDate
       ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
@@ -335,6 +407,8 @@ export default function ItineraryClient() {
               {day.stops.map((s, idx) => {
                 const stopHotelLink = buildAgodaLink({
                   destination: data.input.destination,
+                  area: s.area || suggestedArea,
+                  country,
                   checkIn: day.date,
                   checkOut: day.date ? addDays(day.date, 1) : undefined,
                   adults,

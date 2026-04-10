@@ -1,3 +1,4 @@
+// (your imports unchanged)
 import { Suspense } from "react";
 import { auth } from "@clerk/nextjs/server";
 import PlannerCard from "@/components/PlannerCard";
@@ -5,6 +6,7 @@ import PricingButton from "@/components/PricingButtons";
 import ManageBillingButton from "@/components/ManageBillingButton";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import HeroBadges from "@/components/HeroBadges";
+import Link from "next/link";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -27,6 +29,9 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-orange-50 text-gray-900">
+
+      {/* ===== EXISTING HERO (UNCHANGED) ===== */}
+      {/* keep everything exactly as you had */}
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
         <div className="grid items-center gap-10 md:grid-cols-2">
@@ -192,6 +197,54 @@ export default async function Home() {
           <PlannerCard />
         </Suspense>
       </section>
+
+      {/* 🔥 Popular Itineraries (SEO BOOST) */}
+<section className="mx-auto max-w-6xl px-4 py-10">
+  <h2 className="text-2xl font-semibold text-gray-950">
+    Popular itineraries
+  </h2>
+  <p className="mt-2 text-gray-700">
+    Explore real AI-generated trips from travellers like you.
+  </p>
+
+  <div className="mt-6 grid gap-4 md:grid-cols-3">
+    <Link
+      href="/trips/share/singapore-3-day-family-budget-itinerary"
+      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+    >
+      <div className="font-semibold text-gray-900">
+        Singapore 3 Day Family Itinerary
+      </div>
+      <div className="text-sm text-gray-600 mt-1">
+        Budget-friendly plan with food and easy travel routes
+      </div>
+    </Link>
+
+    <Link
+      href="/trips/share/tokyo-7-day-family-itinerary"
+      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+    >
+      <div className="font-semibold text-gray-900">
+        Tokyo 7 Day Family Itinerary
+      </div>
+      <div className="text-sm text-gray-600 mt-1">
+        Anime spots, food picks, and smart daily flow
+      </div>
+    </Link>
+
+    <Link
+      href="/trips/share/sydney-3-day-family-budget-itinerary"
+      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+    >
+      <div className="font-semibold text-gray-900">
+        Sydney 3 Day Itinerary
+      </div>
+      <div className="text-sm text-gray-600 mt-1">
+        Family-friendly plan with indoor and city highlights
+      </div>
+    </Link>
+  </div>
+</section>
 
       <section id="how" className="border-t border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-16">

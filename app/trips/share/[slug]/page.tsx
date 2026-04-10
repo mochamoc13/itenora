@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   addDays,
-  buildBookingAffiliateLink,
+  buildHotelAffiliateLink,
   buildKlookActivityLink,
   isBookableActivity,
   isTopAttraction,
@@ -31,6 +31,16 @@ function cleanStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function getShortHotelLabel(value?: string) {
+  const text = cleanText(value);
+  if (!text) return "";
+
+  return text
+    .split(",")[0]
+    .replace(/\(.*?\)/g, "")
+    .trim();
+}
+
 function getMeaningfulStayArea(stops: any[], destination: string) {
   if (!Array.isArray(stops)) return "";
 
@@ -55,6 +65,52 @@ function getMeaningfulStayArea(stops: any[], destination: string) {
 
     return area;
   }
+
+  return "";
+}
+
+function getCountryFromDestination(destination: string) {
+  const cleaned = cleanText(destination);
+
+  const parts = cleaned
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return parts[parts.length - 1];
+  }
+
+  const d = cleaned.toLowerCase();
+
+  if (d.includes("tokyo") || d.includes("osaka") || d.includes("kyoto")) {
+    return "Japan";
+  }
+
+  if (d.includes("singapore")) return "Singapore";
+
+  if (
+    d.includes("sydney") ||
+    d.includes("melbourne") ||
+    d.includes("brisbane") ||
+    d.includes("gold coast")
+  ) {
+    return "Australia";
+  }
+
+  if (d.includes("seoul") || d.includes("busan") || d.includes("jeju")) {
+    return "South Korea";
+  }
+
+  if (d.includes("bangkok")) return "Thailand";
+
+  if (d.includes("bali") || d.includes("jakarta")) {
+    return "Indonesia";
+  }
+
+  if (d.includes("auckland")) return "New Zealand";
+  if (d.includes("kuala lumpur")) return "Malaysia";
+  if (d.includes("hong kong")) return "Hong Kong";
 
   return "";
 }
@@ -114,21 +170,47 @@ function getDayHeading(day: any, index: number) {
   return `Day ${day?.day ?? index + 1}${theme ? ` — ${theme}` : ""}`;
 }
 
-function buildAgodaApiLink(params: {
+function getAreaSummary(area: string, destination: string) {
+  if (!area) {
+    return `Browse hotel options for ${destination}.`;
+  }
+
+  return `${area} is a practical base for this itinerary with easier access to nearby stops.`;
+}
+
+function buildAgodaBackupLink(params: {
   destination?: string;
+  country?: string;
   checkIn?: string;
   checkOut?: string;
   adults?: number;
 }) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
-  const url = new URL("/api/agoda-search", baseUrl);
+  const { destination, country, checkIn, checkOut, adults } = params;
 
-  if (params.destination) url.searchParams.set("destination", params.destination);
-  if (params.checkIn) url.searchParams.set("checkIn", params.checkIn);
-  if (params.checkOut) url.searchParams.set("checkOut", params.checkOut);
-  url.searchParams.set("adults", String(params.adults ?? 2));
+  const searchParams = new URLSearchParams();
 
-  return url.toString();
+  const cleanedDestination = cleanText(destination);
+  const cleanedCountry = cleanText(country);
+
+  if (cleanedDestination) {
+    searchParams.set("destination", cleanedDestination);
+  }
+
+  if (cleanedCountry) {
+    searchParams.set("country", cleanedCountry);
+  }
+
+  if (checkIn) {
+    searchParams.set("checkIn", checkIn);
+  }
+
+  if (checkOut) {
+    searchParams.set("checkOut", checkOut);
+  }
+
+  searchParams.set("adults", String(adults || 2));
+
+  return `/api/agoda-search?${searchParams.toString()}`;
 }
 
 export async function generateMetadata({
@@ -232,6 +314,8 @@ export default async function PublicTripPage({ params }: PageProps) {
   const seo = trip.generated_plan?.seo ?? {};
 
   const destination = cleanText(trip.destination || input.destination || "");
+  const tripCountry = getCountryFromDestination(destination);
+
   const title =
     cleanText(seo.h1) ||
     cleanText(trip.title) ||
@@ -260,14 +344,25 @@ export default async function PublicTripPage({ params }: PageProps) {
     trip.end_date ??
     (startDate && days ? addDays(startDate, Math.max(days, 1)) : undefined);
 
-  const bookingLink = buildBookingAffiliateLink({
+  const firstDayStops = Array.isArray(itinerary?.[0]?.stops)
+    ? itinerary[0].stops
+    : [];
+  const topStayArea = getMeaningfulStayArea(firstDayStops, destination);
+  const topStayLabel = getShortHotelLabel(topStayArea || destination);
+  const topHotelButtonLabel =
+    getShortHotelLabel(topStayArea) || getShortHotelLabel(destination);
+
+  const hotelLink = buildHotelAffiliateLink({
     destination,
+    area: topStayArea || undefined,
     checkIn: startDate,
     checkOut: endDate,
+    adults,
   });
 
-  const hotelLink = buildAgodaApiLink({
+  const agodaHotelLink = buildAgodaBackupLink({
     destination,
+    country: tripCountry || undefined,
     checkIn: startDate,
     checkOut: endDate,
     adults,
@@ -296,7 +391,10 @@ export default async function PublicTripPage({ params }: PageProps) {
       name: getDayHeading(day, index),
       description: Array.isArray(day.stops)
         ? day.stops
-            .map((stop: any) => `${stop.time ?? "Anytime"} ${stop.title ?? "Stop"}`)
+            .map(
+              (stop: any) =>
+                `${stop.time ?? "Anytime"} ${stop.title ?? "Stop"}`
+            )
             .join(", ")
         : "",
     })),
@@ -322,8 +420,9 @@ export default async function PublicTripPage({ params }: PageProps) {
           </p>
 
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Updated for 2026 travel. Use this itinerary as a flexible travel guide
-            for what to do, where to go, and how to organise each day more smoothly.
+            Updated for 2026 travel. Use this itinerary as a flexible travel
+            guide for what to do, where to go, and how to organise each day
+            more smoothly.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
@@ -350,7 +449,9 @@ export default async function PublicTripPage({ params }: PageProps) {
         {overviewBullets.length > 0 ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900">
-              {destination ? `${destination} itinerary overview` : "Itinerary overview"}
+              {destination
+                ? `${destination} itinerary overview`
+                : "Itinerary overview"}
             </h2>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
               {overviewBullets.map((item, index) => (
@@ -365,42 +466,60 @@ export default async function PublicTripPage({ params }: PageProps) {
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm font-medium text-amber-900">
-            Tip: Open maps, hotel, or activity links in a new tab so your itinerary
-            stays open.
+            Tip: Open maps, hotel, or activity links in a new tab so your
+            itinerary stays open.
           </p>
           <p className="mt-1 text-xs text-amber-800">
-            This is especially helpful if you opened the trip from Instagram or Facebook.
+            This is especially helpful if you opened the trip from Instagram or
+            Facebook.
           </p>
         </div>
 
         {destination ? (
-          <section className="rounded-2xl border border-orange-100 bg-orange-50 p-5">
-            <h2 className="text-lg font-semibold text-orange-900">
-              Stay recommendation
-            </h2>
-            <p className="mt-2 text-sm text-orange-800">
-              Find the best hotel deals for this itinerary based on the destination
-              {hasValidStartDate ? " and dates" : ""}.
-            </p>
+          <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1 max-w-2xl">
+                <p className="text-sm font-semibold uppercase tracking-wide text-orange-900">
+                  Recommended area
+                </p>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <a
-                href={hotelLink}
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-                className="inline-flex rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-              >
-                Find hotels in {destination}
-              </a>
+                <h2 className="mt-2 text-2xl font-bold text-gray-900">
+                  {topStayLabel}
+                </h2>
 
-              <a
-                href={bookingLink}
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-                className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
-              >
-                Compare prices on Booking.com
-              </a>
+                <p className="mt-2 text-sm leading-6 text-orange-900/85">
+                  {getAreaSummary(topStayArea, destination)}
+                </p>
+
+                <p className="mt-2 text-xs text-gray-600">
+                  Use the main hotel button for the best match. Agoda is
+                  available as a backup option.
+                </p>
+              </div>
+
+              <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[320px]">
+                <a
+                  href={hotelLink}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+                >
+                  Find hotels in {topHotelButtonLabel || "this area"}
+                </a>
+
+                <a
+                  href={agodaHotelLink}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="inline-flex items-center justify-center rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                >
+                  More hotel options on Agoda
+                </a>
+
+                <span className="text-xs text-gray-600">
+                  Both links open in a new tab
+                </span>
+              </div>
             </div>
           </section>
         ) : null}
@@ -409,7 +528,12 @@ export default async function PublicTripPage({ params }: PageProps) {
           itinerary.map((day: any, index: number) => {
             const dayStops = Array.isArray(day.stops) ? day.stops : [];
             const meaningfulArea = getMeaningfulStayArea(dayStops, destination);
-            const displayArea = meaningfulArea || destination;
+            const dayStayLabel =
+              getShortHotelLabel(meaningfulArea) ||
+              getShortHotelLabel(destination);
+            const dayHotelButtonLabel =
+              getShortHotelLabel(meaningfulArea) ||
+              getShortHotelLabel(destination);
 
             const checkIn =
               hasValidStartDate && startDate
@@ -421,18 +545,20 @@ export default async function PublicTripPage({ params }: PageProps) {
                 ? addDays(startDate, index + 1)
                 : undefined;
 
-            const dayHotelLink = buildAgodaApiLink({
+            const dayHotelLink = buildHotelAffiliateLink({
               destination,
+              area: meaningfulArea || undefined,
               checkIn,
               checkOut,
               adults,
             });
 
-            const dayBookingLink = buildBookingAffiliateLink({
+            const dayAgodaLink = buildAgodaBackupLink({
               destination,
-              area: meaningfulArea || undefined,
+              country: tripCountry || undefined,
               checkIn,
               checkOut,
+              adults,
             });
 
             return (
@@ -460,45 +586,46 @@ export default async function PublicTripPage({ params }: PageProps) {
 
                 {destination ? (
                   <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
-                    <p className="text-sm font-semibold text-orange-900">
-                      Stay recommendation for this day
-                    </p>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1 max-w-2xl">
+                        <p className="text-sm font-semibold text-orange-900">
+                          Recommended area: {dayStayLabel}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-orange-800">
+                          {getAreaSummary(meaningfulArea, destination)}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-600">
+                          Search hotels in {dayHotelButtonLabel || "this area"}
+                          {checkIn && checkOut
+                            ? ` from ${checkIn} to ${checkOut}`
+                            : ""}
+                          .
+                        </p>
+                      </div>
 
-                    <p className="mt-1 text-sm text-orange-800">
-                      {meaningfulArea ? (
-                        <>
-                          Staying in{" "}
-                          <span className="font-semibold">{displayArea}</span> is
-                          a good fit for this day’s plan.
-                        </>
-                      ) : (
-                        <>
-                          View hotel options in{" "}
-                          <span className="font-semibold">{destination}</span>.
-                        </>
-                      )}
-                    </p>
+                      <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[280px]">
+                        <a
+                          href={dayHotelLink}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+                        >
+                          Find hotels in {dayHotelButtonLabel || "this area"}
+                        </a>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={dayHotelLink}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="inline-flex rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-                      >
-                        {meaningfulArea
-                          ? `Find hotels in ${displayArea}`
-                          : `Find hotels in ${destination}`}
-                      </a>
+                        <a
+                          href={dayAgodaLink}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="inline-flex items-center justify-center rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                        >
+                          Browse Agoda hotels
+                        </a>
 
-                      <a
-                        href={dayBookingLink}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
-                      >
-                        Compare prices on Booking.com
-                      </a>
+                        <span className="text-xs text-gray-600">
+                          Opens in a new tab
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -507,7 +634,8 @@ export default async function PublicTripPage({ params }: PageProps) {
                   {dayStops.length > 0 ? (
                     dayStops.map((stop: any, i: number) => {
                       const mapQuery =
-                        stop.mapQuery || `${stop.title || "Stop"}, ${destination}`;
+                        stop.mapQuery ||
+                        `${stop.title || "Stop"}, ${destination}`;
                       const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
                         mapQuery
                       )}`;
@@ -540,7 +668,8 @@ export default async function PublicTripPage({ params }: PageProps) {
                                 </p>
                               ) : (
                                 <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                                  A suggested stop for this part of the itinerary.
+                                  A suggested stop for this part of the
+                                  itinerary.
                                 </p>
                               )}
                             </div>
@@ -564,7 +693,10 @@ export default async function PublicTripPage({ params }: PageProps) {
 
                             {isBookableActivity(stop.title) ? (
                               <a
-                                href={buildKlookActivityLink(stop.title, destination)}
+                                href={buildKlookActivityLink(
+                                  stop.title,
+                                  destination
+                                )}
                                 target="_blank"
                                 rel="noopener noreferrer sponsored"
                                 className={`inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition ${
@@ -580,7 +712,8 @@ export default async function PublicTripPage({ params }: PageProps) {
                             ) : null}
 
                             <span className="w-full text-xs text-gray-500">
-                              Opens in a new tab so you can keep this itinerary open.
+                              Opens in a new tab so you can keep this itinerary
+                              open.
                             </span>
                           </div>
                         </div>

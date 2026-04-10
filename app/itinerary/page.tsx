@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import UsageSummary from "@/components/UsageSummary";
 import ShareTripButton from "@/components/ShareTripButton";
-import { addDays, buildBookingAffiliateLink } from "@/lib/affiliate";
+import { addDays, buildHotelAffiliateLink } from "@/lib/affiliate";
 
 export default async function ItineraryPage() {
   const { userId } = await auth();
@@ -91,7 +91,6 @@ export default async function ItineraryPage() {
               : "";
 
             const destination = trip.destination || input.destination || "";
-
             const startDate = trip.start_date ?? input.startDate ?? undefined;
 
             const endDate =
@@ -100,11 +99,21 @@ export default async function ItineraryPage() {
                 ? addDays(startDate, Math.max(days - 1, 0))
                 : undefined);
 
-            const bookingLink = buildBookingAffiliateLink({
+            const hotelLink = buildHotelAffiliateLink({
               destination,
               checkIn: startDate,
               checkOut: endDate,
+              adults:
+                people === "solo"
+                  ? 1
+                  : people === "couple"
+                    ? 2
+                    : 2,
             });
+
+            const openTripHref = trip.slug
+              ? `/trips/share/${trip.slug}`
+              : `/itinerary/${trip.id}`;
 
             return (
               <div
@@ -148,16 +157,16 @@ export default async function ItineraryPage() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-           <Link
-  href={`/trips/share/${trip.slug}`}
-  className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
->
-  Open trip
-</Link>
+                      <Link
+                        href={openTripHref}
+                        className="inline-flex rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                      >
+                        Open trip
+                      </Link>
 
                       {destination ? (
                         <a
-                          href={bookingLink}
+                          href={hotelLink}
                           target="_blank"
                           rel="noopener noreferrer sponsored"
                           className="inline-flex rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
@@ -174,7 +183,7 @@ export default async function ItineraryPage() {
                       <p className="font-medium text-gray-700">{createdAt}</p>
                     </div>
 
-                {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
+                    {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
                   </div>
                 </div>
               </div>

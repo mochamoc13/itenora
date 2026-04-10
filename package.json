@@ -6,11 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:agoda-cities": "node scripts/build-agoda-cities.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.39.0",
     "@supabase/supabase-js": "^2.99.1",
+    "csv-parse": "^6.2.1",
     "html-to-image": "^1.11.13",
     "next": "^14.2.35",
     "openai": "^6.25.0",
