@@ -31,51 +31,6 @@ function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getCountryFromDestination(destination: string) {
-  const cleaned = cleanText(destination);
-
-  const parts = cleaned
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length >= 2) {
-    return parts[parts.length - 1];
-  }
-
-  const d = cleaned.toLowerCase();
-
-  if (d.includes("tokyo") || d.includes("osaka") || d.includes("kyoto")) {
-    return "Japan";
-  }
-
-  if (d.includes("singapore")) return "Singapore";
-
-  if (
-    d.includes("sydney") ||
-    d.includes("melbourne") ||
-    d.includes("brisbane") ||
-    d.includes("gold coast")
-  ) {
-    return "Australia";
-  }
-
-  if (d.includes("seoul") || d.includes("busan") || d.includes("jeju")) {
-    return "South Korea";
-  }
-
-  if (d.includes("bangkok")) return "Thailand";
-
-  if (d.includes("bali") || d.includes("jakarta")) {
-    return "Indonesia";
-  }
-
-  if (d.includes("auckland")) return "New Zealand";
-  if (d.includes("kuala lumpur")) return "Malaysia";
-
-  return "";
-}
-
 function getMeaningfulStayArea(stops: any[], destination: string) {
   if (!Array.isArray(stops)) return "";
 
@@ -93,7 +48,8 @@ function getMeaningfulStayArea(stops: any[], destination: string) {
       areaLower === "city center" ||
       areaLower === "city centre" ||
       areaLower === "downtown" ||
-      areaLower === "central"
+      areaLower === "central" ||
+      areaLower === "cbd"
     ) {
       continue;
     }
@@ -148,7 +104,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
   const editHref = `/?${editParams.toString()}#planner`;
   const tripDestination = cleanText(trip.destination);
-  const tripCountry = getCountryFromDestination(tripDestination);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -226,7 +181,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <ShareTripButton tripId={trip.id} />
+              {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
               <DownloadImageButton />
 
               <a
@@ -280,7 +235,6 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             const hotelLink = buildHotelAffiliateLink({
               destination: tripDestination,
               area: meaningfulArea || undefined,
-              country: tripCountry || undefined,
               checkIn,
               checkOut,
             });
@@ -314,37 +268,37 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                   </div>
                 </div>
 
-               {showHotelBox ? (
-  <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
-    <p className="text-sm font-semibold text-orange-900">
-      Stay recommendation
-    </p>
+                {showHotelBox ? (
+                  <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                    <p className="text-sm font-semibold text-orange-900">
+                      Stay recommendation
+                    </p>
 
-    <p className="mt-1 text-sm text-orange-800">
-      Browse hotel options for this part of the trip on Agoda.
-    </p>
+                    <p className="mt-1 text-sm text-orange-800">
+                      Browse hotel options for this part of the trip.
+                    </p>
 
-    <div className="mt-3 flex flex-wrap gap-2">
-      <a
-        href={bookingLink}
-        target="_blank"
-        rel="noopener noreferrer sponsored"
-        className="inline-flex rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-      >
-        Compare prices on Booking.com
-      </a>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={bookingLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        Compare prices on Booking.com
+                      </a>
 
-      <a
-        href={hotelLink}
-        target="_blank"
-        rel="noopener noreferrer sponsored"
-        className="inline-flex rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
-      >
-        Check hotels on Agoda
-      </a>
-    </div>
-  </div>
-) : null}
+                      <a
+                        href={hotelLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
+                      >
+                        Check hotels on Trip.com
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="space-y-4">
                   {dayStops.map((stop: any, index: number) => (

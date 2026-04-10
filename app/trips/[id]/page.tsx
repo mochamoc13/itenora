@@ -30,6 +30,16 @@ function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getShortHotelLabel(value?: string) {
+  const text = cleanText(value);
+  if (!text) return "";
+
+  return text
+    .split(",")[0]
+    .replace(/\(.*?\)/g, "")
+    .trim();
+}
+
 function getCountryFromDestination(destination: string) {
   const cleaned = cleanText(destination);
 
@@ -71,6 +81,7 @@ function getCountryFromDestination(destination: string) {
 
   if (d.includes("auckland")) return "New Zealand";
   if (d.includes("kuala lumpur")) return "Malaysia";
+  if (d.includes("hong kong")) return "Hong Kong";
 
   return "";
 }
@@ -196,7 +207,9 @@ export default async function TripDetailPage({ params }: TripPageProps) {
     ? itinerary[0].stops
     : [];
   const topStayArea = getMeaningfulStayArea(firstDayStops, tripDestination);
-  const topStayLabel = topStayArea || tripDestination;
+  const topStayLabel = getShortHotelLabel(topStayArea || tripDestination);
+  const topHotelButtonLabel =
+    getShortHotelLabel(topStayArea) || getShortHotelLabel(tripDestination);
 
   const tripAdults =
     input.people === "solo" ? 1 : input.people === "couple" ? 2 : 2;
@@ -305,7 +318,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <ShareTripButton tripId={trip.id} />
+           {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
               <DownloadImageButton />
 
               <a
@@ -338,32 +351,35 @@ export default async function TripDetailPage({ params }: TripPageProps) {
         </div>
 
         {tripDestination ? (
-          <div className="mb-8 rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-2xl">
+          <section className="mb-8 rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1 max-w-2xl">
                 <p className="text-sm font-semibold uppercase tracking-wide text-orange-900">
                   Recommended area
                 </p>
+
                 <h2 className="mt-2 text-2xl font-bold text-gray-900">
                   {topStayLabel}
                 </h2>
+
                 <p className="mt-2 text-sm leading-6 text-orange-900/85">
                   {getAreaSummary(topStayArea, tripDestination)}
                 </p>
+
                 <p className="mt-2 text-xs text-gray-600">
-                  Use Trip.com as the main hotel search for {tripDestination}.
-                  Agoda is available as a backup option.
+                  Use the main hotel button for the best match. Agoda is
+                  available as a backup option.
                 </p>
               </div>
 
-              <div className="flex shrink-0 flex-col gap-2">
+              <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[320px]">
                 <a
                   href={overallHotelLink}
                   target="_blank"
                   rel="noopener noreferrer sponsored"
                   className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
                 >
-                  Find hotels in {tripDestination}
+                  Find hotels in {topHotelButtonLabel || "this area"}
                 </a>
 
                 <a
@@ -380,7 +396,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                 </span>
               </div>
             </div>
-          </div>
+          </section>
         ) : null}
 
         <div className="space-y-8">
@@ -390,7 +406,12 @@ export default async function TripDetailPage({ params }: TripPageProps) {
               dayStops,
               tripDestination
             );
-            const displayArea = meaningfulArea || tripDestination;
+            const displayArea =
+              getShortHotelLabel(meaningfulArea) ||
+              getShortHotelLabel(tripDestination);
+            const dayHotelButtonLabel =
+              getShortHotelLabel(meaningfulArea) ||
+              getShortHotelLabel(tripDestination);
             const showHotelBox = Boolean(tripDestination);
 
             const checkIn =
@@ -443,8 +464,8 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
                 {showHotelBox ? (
                   <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="max-w-2xl">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1 max-w-2xl">
                         <p className="text-sm font-semibold text-orange-900">
                           Recommended area: {displayArea}
                         </p>
@@ -454,7 +475,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                         </p>
 
                         <p className="mt-1 text-xs text-gray-600">
-                          Search hotels in {tripDestination}
+                          Search hotels in {dayHotelButtonLabel || "this area"}
                           {checkIn && checkOut
                             ? ` from ${checkIn} to ${checkOut}`
                             : ""}
@@ -462,14 +483,14 @@ export default async function TripDetailPage({ params }: TripPageProps) {
                         </p>
                       </div>
 
-                      <div className="flex shrink-0 flex-col gap-2">
+                      <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[280px]">
                         <a
                           href={hotelLink}
                           target="_blank"
                           rel="noopener noreferrer sponsored"
                           className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
                         >
-                          Find hotels in {tripDestination}
+                          Find hotels in {dayHotelButtonLabel || "this area"}
                         </a>
 
                         <a
