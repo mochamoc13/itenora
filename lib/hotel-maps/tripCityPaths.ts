@@ -1,14 +1,19 @@
 export const CITY_PATHS: Record<string, string> = {
+  // =========================
   // ASIA
+  // =========================
   singapore: "https://au.trip.com/hotels/singapore-hotels-list-73/",
   "hong kong": "https://au.trip.com/hotels/hong-kong-hotels-list-58/",
   tokyo: "https://au.trip.com/hotels/tokyo-hotels-list-228/",
   osaka: "https://au.trip.com/hotels/osaka-hotels-list-219/",
   kyoto: "https://au.trip.com/hotels/kyoto-hotels-list-430/",
+  sapporo: "https://au.trip.com/hotels/sapporo-hotels-list-641/",
   seoul: "https://au.trip.com/hotels/seoul-hotels-list-274/",
+  busan: "https://au.trip.com/hotels/busan-hotels-list-253/",
+  jeju: "https://au.trip.com/hotels/jeju-hotels-list-737/",
   bangkok: "https://au.trip.com/hotels/bangkok-hotels-list-359/",
   phuket: "https://au.trip.com/hotels/phuket-hotels-list-725/",
-    bali: "https://au.trip.com/hotels/bali-hotels-list-723/",
+  bali: "https://au.trip.com/hotels/bali-hotels-list-723/",
   jakarta: "https://au.trip.com/hotels/jakarta-hotels-list-524/",
   bandung: "https://au.trip.com/hotels/bandung-hotels-list-740/",
   surabaya: "https://au.trip.com/hotels/surabaya-hotels-list-1244/",
@@ -28,37 +33,48 @@ export const CITY_PATHS: Record<string, string> = {
   dubai: "https://au.trip.com/hotels/dubai-hotels-list-220/",
   istanbul: "https://au.trip.com/hotels/istanbul-hotels-list-168/",
   manila: "https://au.trip.com/hotels/manila-hotels-list-364/",
+  cebu: "https://au.trip.com/hotels/cebu-hotels-list-1239/",
 
+  // =========================
   // EUROPE
+  // =========================
   paris: "https://au.trip.com/hotels/paris-hotels-list-192/",
   rome: "https://au.trip.com/hotels/rome-hotels-list-343/",
   milan: "https://au.trip.com/hotels/milan-hotels-list-361/",
   naples: "https://au.trip.com/hotels/naples-hotels-list-1262/",
+  florence: "https://au.trip.com/hotels/florence-hotels-list-687/",
+  venice: "https://au.trip.com/hotels/venice-hotels-list-688/",
   barcelona: "https://au.trip.com/hotels/barcelona-hotels-list-110/",
+  madrid: "https://au.trip.com/hotels/madrid-hotels-list-357/",
   london: "https://au.trip.com/hotels/london-hotels-list-269/",
   amsterdam: "https://au.trip.com/hotels/amsterdam-hotels-list-57/",
   zurich: "https://au.trip.com/hotels/zurich-hotels-list-384/",
   berlin: "https://au.trip.com/hotels/berlin-hotels-list-306/",
   vienna: "https://au.trip.com/hotels/vienna-hotels-list-651/",
   lisbon: "https://au.trip.com/hotels/lisbon-hotels-list-1231/",
+  porto: "https://au.trip.com/hotels/porto-hotels-list-826/",
   athens: "https://au.trip.com/hotels/athens-hotels-list-710/",
-  florence: "https://au.trip.com/hotels/florence-hotels-list-687/",
-  venice: "https://au.trip.com/hotels/venice-hotels-list-688/",
   santorini: "https://au.trip.com/hotels/santorini-hotels-list-3571/",
   mykonos: "https://au.trip.com/hotels/mykonos-hotels-list-4228/",
 
-  // AUSTRALIA / NZ
+  // =========================
+  // AUSTRALIA / NEW ZEALAND
+  // =========================
   sydney: "https://au.trip.com/hotels/sydney-hotels-list-501/",
   melbourne: "https://au.trip.com/hotels/melbourne-hotels-list-358/",
   brisbane: "https://au.trip.com/hotels/brisbane-hotels-list-680/",
   "gold coast": "https://au.trip.com/hotels/gold-coast-hotels-list-1210/",
   perth: "https://au.trip.com/hotels/perth-hotels-list-681/",
-  adelaide: "https://au.trip.com/hotels/adelaide-hotels-list-1245/",
+  adelaide: "https://au.trip.com/hotels/adelaide-hotels-list-1243/",
+  cairns: "https://au.trip.com/hotels/cairns-hotels-list-728/",
+  hobart: "https://au.trip.com/hotels/hobart-hotels-list-1446/",
   auckland: "https://au.trip.com/hotels/auckland-hotels-list-678/",
   queenstown: "https://au.trip.com/hotels/queenstown-hotels-list-1993/",
 
+  // =========================
   // USA / CANADA
-  "new york": "https://au.trip.com/hotels/new-york-hotels-list-248/",
+  // =========================
+  "new york": "https://au.trip.com/hotels/new-york-hotels-list-633/",
   "los angeles": "https://au.trip.com/hotels/los-angeles-hotels-list-347/",
   "las vegas": "https://au.trip.com/hotels/las-vegas-hotels-list-400/",
   orlando: "https://au.trip.com/hotels/orlando-hotels-list-1187/",
@@ -66,10 +82,13 @@ export const CITY_PATHS: Record<string, string> = {
   honolulu: "https://au.trip.com/hotels/honolulu-hotels-list-757/",
   chicago: "https://au.trip.com/hotels/chicago-hotels-list-549/",
   "san francisco": "https://au.trip.com/hotels/san-francisco-hotels-list-313/",
+  seattle: "https://au.trip.com/hotels/seattle-hotels-list-511/",
   vancouver: "https://au.trip.com/hotels/vancouver-hotels-list-476/",
   toronto: "https://au.trip.com/hotels/toronto-hotels-list-311/",
 
+  // =========================
   // SOUTH AMERICA
+  // =========================
   "rio de janeiro": "https://au.trip.com/hotels/rio-de-janeiro-hotels-list-769/",
   "sao paulo": "https://au.trip.com/hotels/sao-paulo-hotels-list-301/",
 };

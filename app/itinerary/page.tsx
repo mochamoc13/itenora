@@ -76,12 +76,15 @@ export default async function ItineraryPage() {
           {trips.map((trip: any) => {
             const input = trip.generated_plan?.input ?? {};
 
+            const titleMatch = trip.title?.match(/^(\d+)/);
             const days =
-              typeof input.days === "number"
-                ? input.days
-                : Array.isArray(trip.generated_plan?.itinerary)
-                  ? trip.generated_plan.itinerary.length
-                  : null;
+              titleMatch && titleMatch[1]
+                ? Number(titleMatch[1])
+                : typeof input.days === "number"
+                  ? input.days
+                  : Array.isArray(trip.generated_plan?.itinerary)
+                    ? trip.generated_plan.itinerary.length
+                    : null;
 
             const people = input.people ?? null;
             const budget = input.budget ?? trip.budget ?? null;
@@ -174,6 +177,15 @@ export default async function ItineraryPage() {
                           Find hotels for this trip
                         </a>
                       ) : null}
+
+                <form action={`/api/trips/${trip.id}/delete`} method="POST">
+  <button
+    type="submit"
+    className="inline-flex rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+  >
+    Delete trip
+  </button>
+</form>
                     </div>
                   </div>
 

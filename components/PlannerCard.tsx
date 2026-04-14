@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import GeneratingLoader from "@/components/GeneratingLoader";
 import DestinationLookup from "@/components/DestinationLookup";
 
@@ -38,24 +37,204 @@ type DestinationOption = {
   lng?: number;
 };
 
+const INTEREST_OPTIONS = [
+  "Food",
+  "Sightseeing",
+  "Shopping",
+  "Nature",
+  "Theme parks",
+  "Museums",
+  "Anime",
+  "Beaches",
+  "Night markets",
+  "Hidden gems",
+  "Local experiences",
+  "Family-friendly",
+  "Nightlife",
+  "Relaxation",
+  "Instagram spots",
+] as const;
+
+type InterestOption = (typeof INTEREST_OPTIONS)[number];
+
+const SIMPLE_INTERESTS: InterestOption[] = ["Food", "Sightseeing"];
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function uniqueInterests(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function arraysEqualIgnoreOrder(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((item, index) => item === bb[index]);
+}
+
+function getSuggestedInterests(args: {
+  destination: string;
+  people: "Solo" | "Couple" | "Friends" | "Family";
+  childAges: "none" | "baby" | "toddler" | "kids" | "teens";
+}): string[] {
+  const { destination, people, childAges } = args;
+  const text = normalizeText(destination);
+
+  const picks: string[] = ["Food", "Sightseeing"];
+
+  const add = (...items: InterestOption[]) => {
+    picks.push(...items);
+  };
+
+  if (people === "Family") {
+    add("Family-friendly");
+  }
+
+  if (childAges === "kids" || childAges === "teens") {
+    add("Family-friendly");
+  }
+
+  if (people === "Couple") {
+    add("Relaxation");
+  }
+
+  if (people === "Friends") {
+    add("Nightlife", "Local experiences");
+  }
+
+  if (people === "Solo") {
+    add("Hidden gems", "Local experiences");
+  }
+
+  if (
+    text.includes("tokyo") ||
+    text.includes("japan") ||
+    text.includes("osaka") ||
+    text.includes("kyoto") ||
+    text.includes("akihabara") ||
+    text.includes("shibuya")
+  ) {
+    add("Anime", "Food", "Shopping", "Sightseeing");
+  }
+
+  if (
+    text.includes("seoul") ||
+    text.includes("south korea") ||
+    text.includes("korea") ||
+    text.includes("busan") ||
+    text.includes("myeongdong") ||
+    text.includes("hongdae")
+  ) {
+    add("Shopping", "Food", "Nightlife", "Local experiences");
+  }
+
+  if (
+    text.includes("singapore") ||
+    text.includes("sentosa") ||
+    text.includes("orchard")
+  ) {
+    add("Food", "Sightseeing", "Shopping", "Family-friendly");
+  }
+
+  if (
+    text.includes("bangkok") ||
+    text.includes("thailand") ||
+    text.includes("phuket") ||
+    text.includes("chiang mai") ||
+    text.includes("krabi")
+  ) {
+    add("Food", "Night markets", "Local experiences");
+  }
+
+  if (
+    text.includes("bali") ||
+    text.includes("indonesia") ||
+    text.includes("phuket") ||
+    text.includes("krabi") ||
+    text.includes("koh samui") ||
+    text.includes("boracay") ||
+    text.includes("cebu") ||
+    text.includes("honolulu") ||
+    text.includes("hawaii") ||
+    text.includes("gold coast")
+  ) {
+    add("Beaches", "Relaxation", "Nature");
+  }
+
+  if (
+    text.includes("sydney") ||
+    text.includes("melbourne") ||
+    text.includes("brisbane") ||
+    text.includes("adelaide") ||
+    text.includes("perth") ||
+    text.includes("new york") ||
+    text.includes("london") ||
+    text.includes("paris") ||
+    text.includes("rome") ||
+    text.includes("barcelona")
+  ) {
+    add("Sightseeing", "Food", "Shopping");
+  }
+
+  if (
+    text.includes("paris") ||
+    text.includes("rome") ||
+    text.includes("florence") ||
+    text.includes("vienna") ||
+    text.includes("athens") ||
+    text.includes("london") ||
+    text.includes("madrid")
+  ) {
+    add("Museums", "Local experiences", "Sightseeing");
+  }
+
+  if (
+    text.includes("dubai") ||
+    text.includes("los angeles") ||
+    text.includes("new york") ||
+    text.includes("miami") ||
+    text.includes("las vegas")
+  ) {
+    add("Instagram spots", "Nightlife", "Shopping");
+  }
+
+  if (
+    text.includes("queenstown") ||
+    text.includes("switzerland") ||
+    text.includes("interlaken") ||
+    text.includes("cairns") ||
+    text.includes("hobart") ||
+    text.includes("new zealand")
+  ) {
+    add("Nature", "Hidden gems", "Local experiences");
+  }
+
+  if (
+    text.includes("disney") ||
+    text.includes("orlando") ||
+    text.includes("anaheim") ||
+    text.includes("universal")
+  ) {
+    add("Theme parks", "Family-friendly");
+  }
+
+  const deduped = uniqueInterests(picks).filter((item) =>
+    INTEREST_OPTIONS.includes(item as InterestOption)
+  );
+
+  return deduped.slice(0, 5);
+}
+
 export default function PlannerCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const interestOptions = [
-    "Food",
-    "Nature",
-    "Shopping",
-    "Theme parks",
-    "Museums",
-    "Anime",
-    "Beaches",
-    "Night markets",
-  ] as const;
-
   const [destination, setDestination] = React.useState(
     searchParams.get("destination") || ""
   );
+
   const [destinationData, setDestinationData] =
     React.useState<DestinationOption | null>(
       searchParams.get("destination")
@@ -101,16 +280,6 @@ export default function PlannerCard() {
     searchParams.get("startDate") || ""
   );
 
-  const [selected, setSelected] = React.useState<string[]>(
-    searchParams.get("interests")
-      ? searchParams
-          .get("interests")!
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean)
-      : ["Food", "Anime", "Shopping"]
-  );
-
   const [arrivalTime, setArrivalTime] = React.useState<string>(
     searchParams.get("arrivalTime") || ""
   );
@@ -130,9 +299,71 @@ export default function PlannerCard() {
       | "teens") || "none")
   );
 
+  const initialInterests = React.useMemo(() => {
+    const fromQuery = searchParams.get("interests");
+    if (fromQuery) {
+      return fromQuery
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+
+    return getSuggestedInterests({
+      destination: searchParams.get("destination") || "",
+      people:
+        (() => {
+          const p = searchParams.get("people");
+          if (p === "solo") return "Solo";
+          if (p === "couple") return "Couple";
+          if (p === "family") return "Family";
+          return "Family";
+        })(),
+      childAges:
+        ((searchParams.get("childAges") as
+          | "none"
+          | "baby"
+          | "toddler"
+          | "kids"
+          | "teens") || "none"),
+    });
+  }, [searchParams]);
+
+  const [selected, setSelected] = React.useState<string[]>(initialInterests);
+
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [usage, setUsage] = React.useState<UsageInfo | null>(null);
+  const [interestMode, setInterestMode] = React.useState<"auto" | "manual">(
+    searchParams.get("interests") ? "manual" : "auto"
+  );
+
+  const destinationInputRef = React.useRef(destination);
+  const selectedDestinationRef = React.useRef<DestinationOption | null>(
+    destinationData
+  );
+
+  React.useEffect(() => {
+    destinationInputRef.current = destination;
+  }, [destination]);
+
+  React.useEffect(() => {
+    selectedDestinationRef.current = destinationData;
+  }, [destinationData]);
+
+  const suggestedInterests = React.useMemo(
+    () =>
+      getSuggestedInterests({
+        destination: destinationData?.label?.trim() || destination.trim() || "",
+        people,
+        childAges,
+      }),
+    [destination, destinationData, people, childAges]
+  );
+
+  const isDestinationResolved =
+    !!destination.trim() &&
+    !!destinationData &&
+    normalizeText(destinationData.label) === normalizeText(destination);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -160,15 +391,40 @@ export default function PlannerCard() {
     };
   }, []);
 
+  React.useEffect(() => {
+    if (interestMode !== "auto") return;
+
+    setSelected((prev) => {
+      if (arraysEqualIgnoreOrder(prev, suggestedInterests)) {
+        return prev;
+      }
+      return suggestedInterests;
+    });
+  }, [suggestedInterests, interestMode]);
+
   const toggleInterest = (t: string) => {
     if (loading) return;
 
+    setInterestMode("manual");
     setSelected((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
   };
 
+  const applySuggestedInterests = () => {
+    if (loading) return;
+    setInterestMode("auto");
+    setSelected(suggestedInterests);
+  };
+
+  const applySimpleInterests = () => {
+    if (loading) return;
+    setInterestMode("manual");
+    setSelected(SIMPLE_INTERESTS);
+  };
+
   const safeDays = Math.min(14, Math.max(1, Number.isFinite(days) ? days : 3));
+
   const pace: "relaxed" | "balanced" =
     people === "Family" ? "relaxed" : "balanced";
 
@@ -187,84 +443,53 @@ export default function PlannerCard() {
       setLoading(true);
       setError("");
 
-      if (!destinationData) {
-        setError("Please select a valid destination from the list");
+      const finalDestinationData: DestinationOption | null =
+        destinationData && destinationData.label.trim()
+          ? destinationData
+          : destination.trim()
+            ? { label: destination.trim() }
+            : null;
+
+      if (!finalDestinationData) {
+        setError("Please enter a destination");
         setLoading(false);
         return;
       }
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-         destination: destinationData.label,
-city: destinationData.city,
-country: destinationData.country,
-area: destinationData.label, // 🔥 ADD THIS
+      const params = new URLSearchParams();
+      params.set("destination", finalDestinationData.label);
+      params.set("days", String(safeDays));
+      params.set("people", PEOPLE_MAP[people]);
+      params.set("budget", BUDGET_MAP[budget]);
+      params.set("pace", pace);
 
-          lat: destinationData.lat,
-          lng: destinationData.lng,
-          days: safeDays,
-          people: PEOPLE_MAP[people],
-          budget: BUDGET_MAP[budget],
-          pace,
-          startDate: startDate || undefined,
-          arrivalTime: arrivalTime || undefined,
-          departTime: departTime || undefined,
-          childAges,
-          interests: selected.map((s) => s.trim()).filter(Boolean),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data?.usage) {
-        setUsage({
-          plan: data.usage.plan,
-          used: data.usage.used,
-          limit: data.usage.limit,
-          usageLabel:
-            data.usage.limit === "unlimited"
-              ? `${data.usage.used} itineraries used this billing period`
-              : `${data.usage.used} / ${data.usage.limit} itineraries used ${
-                  data.usage.periodStart ? "this billing period" : "this month"
-                }`,
-          periodType: data.usage.periodStart ? "billing_period" : "month",
-          currentPeriodStart: data.usage.periodStart ?? null,
-          currentPeriodEnd: data.usage.periodEnd ?? null,
-        });
+      if (finalDestinationData.city) {
+        params.set("city", finalDestinationData.city);
       }
 
-      if (!res.ok) {
-   if (res.status === 429) {
-  setError(
-    data.error ||
-      "Please wait a moment before starting another itinerary."
-  );
-  return;
-}
-
-        throw new Error(data.error || "Failed to generate itinerary");
+      if (finalDestinationData.country) {
+        params.set("country", finalDestinationData.country);
       }
 
-if (data.savedTrip?.slug) {
-  router.push(`/trips/share/${data.savedTrip.slug}`);
-  return;
-}
+      if (typeof finalDestinationData.lat === "number") {
+        params.set("lat", String(finalDestinationData.lat));
+      }
 
-if (data.savedTrip?.id) {
-  router.push("/itinerary");
-  return;
-}
+      if (typeof finalDestinationData.lng === "number") {
+        params.set("lng", String(finalDestinationData.lng));
+      }
 
-      router.push("/itinerary");
+      if (startDate) params.set("startDate", startDate);
+      if (arrivalTime) params.set("arrivalTime", arrivalTime);
+      if (departTime) params.set("departTime", departTime);
+      if (childAges) params.set("childAges", childAges);
+      if (selected.length > 0) params.set("interests", selected.join(","));
+
+      router.push(`/generate?${params.toString()}`);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
       setError(message);
-    } finally {
       setLoading(false);
     }
   }
@@ -310,7 +535,8 @@ if (data.savedTrip?.id) {
           <div className="mt-1 text-gray-600">{usageText}</div>
           {usage.periodType === "billing_period" && usage.currentPeriodEnd ? (
             <div className="mt-1 text-xs text-gray-500">
-            Renews on {new Date(usage.currentPeriodEnd).toLocaleDateString("en-AU")}
+              Renews on{" "}
+              {new Date(usage.currentPeriodEnd).toLocaleDateString("en-AU")}
             </div>
           ) : null}
         </div>
@@ -334,18 +560,35 @@ if (data.savedTrip?.id) {
                   initialValue={destination}
                   disabled={loading}
                   onSelect={(item: DestinationOption) => {
-                    setDestinationData(item);
                     setDestination(item.label);
-                    setError("");
+
+                    requestAnimationFrame(() => {
+                      setDestinationData(item);
+                      setError("");
+                    });
                   }}
                   onChangeText={(value: string) => {
                     setDestination(value);
-                    setDestinationData(null);
+
+                    const currentSelected = selectedDestinationRef.current;
+                    if (
+                      !currentSelected ||
+                      normalizeText(value) !== normalizeText(currentSelected.label)
+                    ) {
+                      setDestinationData(null);
+                    }
                   }}
                 />
               </div>
+
+              {!loading && destination.trim() && !isDestinationResolved && (
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Resolving destination…
+                </p>
+              )}
+
               <p className="mt-1 text-[11px] text-gray-500">
-                Choose a real city or country from the list.
+                Choose a real city or country from the list, or type one manually.
               </p>
             </div>
 
@@ -483,19 +726,31 @@ if (data.savedTrip?.id) {
                 <label className="text-xs font-semibold text-gray-700">
                   Interests
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setSelected(["Food", "Nature"])}
-                  disabled={loading}
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Use simple
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={applySuggestedInterests}
+                    disabled={loading}
+                    className="text-xs font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Use suggested
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applySimpleInterests}
+                    disabled={loading}
+                    className="text-xs font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Use simple
+                  </button>
+                </div>
               </div>
 
               <div className="mt-2 flex flex-wrap gap-2">
-                {interestOptions.map((t) => {
+                {INTEREST_OPTIONS.map((t) => {
                   const on = selected.includes(t);
+                  const suggested = suggestedInterests.includes(t);
+
                   return (
                     <button
                       key={t}
@@ -506,9 +761,12 @@ if (data.savedTrip?.id) {
                         "rounded-full border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
                         on
                           ? "border-transparent bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white shadow-sm"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
+                          : suggested
+                            ? "border-orange-200 bg-orange-50 text-gray-700 hover:border-orange-300"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
                       ].join(" ")}
                       aria-pressed={on}
+                      title={suggested ? "Suggested for this trip" : undefined}
                     >
                       {t}
                     </button>
@@ -517,36 +775,32 @@ if (data.savedTrip?.id) {
               </div>
 
               <p className="mt-2 text-xs text-gray-500">
-                Selected:{" "}
+                {interestMode === "auto" ? "Auto-selected" : "Selected"}:{" "}
                 <span className="font-medium text-gray-700">
                   {selected.length
                     ? selected.join(", ")
                     : "None (we’ll keep it general)"}
                 </span>
               </p>
+
+              {suggestedInterests.length > 0 && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Suggested for this trip:{" "}
+                  <span className="font-medium text-gray-700">
+                    {suggestedInterests.join(", ")}
+                  </span>
+                </p>
+              )}
             </div>
 
             <div className="md:col-span-12">
-              <SignedOut>
-                <SignInButton mode="modal" forceRedirectUrl="/#planner">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-black px-6 py-3 text-white"
-                  >
-                    Sign in to generate
-                  </button>
-                </SignInButton>
-              </SignedOut>
-
-              <SignedIn>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="rounded-lg bg-black px-6 py-3 text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? "Generating..." : "Generate my itinerary"}
-                </button>
-              </SignedIn>
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-lg bg-black px-6 py-3 text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Generating..." : "Plan my trip free"}
+              </button>
 
               {loading && (
                 <p className="mt-3 text-sm text-gray-500">
@@ -663,21 +917,41 @@ function buildMockPlan({
   budget: string;
   interests: string[];
 }) {
+  const lowerInterests = interests.map((x) => x.toLowerCase());
+
   const focus =
     interests.length === 0
       ? "highlights"
-      : interests.some((x) => x.toLowerCase().includes("food"))
-      ? "food + local spots"
-      : interests.some((x) => x.toLowerCase().includes("nature"))
-      ? "nature + scenic stops"
-      : "top experiences";
+      : lowerInterests.some((x) => x.includes("food"))
+        ? "food + local eats"
+        : lowerInterests.some((x) => x.includes("sightseeing"))
+          ? "iconic sights + landmarks"
+          : lowerInterests.some((x) => x.includes("nature"))
+            ? "nature + scenic spots"
+            : lowerInterests.some((x) => x.includes("shopping"))
+              ? "shopping + local areas"
+              : lowerInterests.some((x) => x.includes("hidden"))
+                ? "hidden gems + unique spots"
+                : lowerInterests.some((x) => x.includes("instagram"))
+                  ? "photo spots + viral locations"
+                  : lowerInterests.some((x) => x.includes("nightlife"))
+                    ? "nightlife + evening activities"
+                    : lowerInterests.some((x) => x.includes("family"))
+                      ? "family-friendly attractions"
+                      : lowerInterests.some((x) => x.includes("anime"))
+                        ? "anime spots + pop culture"
+                        : lowerInterests.some((x) => x.includes("beaches"))
+                          ? "beaches + relaxing stops"
+                          : lowerInterests.some((x) => x.includes("museums"))
+                            ? "museums + cultural highlights"
+                            : "top experiences";
 
   const pace =
     people === "Family"
       ? "family pace"
       : budget === "Luxury"
-      ? "comfortable"
-      : "balanced";
+        ? "comfortable"
+        : "balanced";
 
   const spend = (() => {
     if (budget === "Budget") return "Low";

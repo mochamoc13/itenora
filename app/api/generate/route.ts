@@ -96,8 +96,6 @@ type SafeRequest = Required<
   lng?: number;
 };
 
-type ChunkResult = NonNullable<ParsedAiItinerary["itinerary"]>;
-
 type UsageInfo = {
   allowed: boolean;
   plan: AppPlan;
@@ -111,6 +109,21 @@ type UsageInfo = {
 type GenerationLockResult =
   | { acquired: true; retryAfterSeconds: 0 }
   | { acquired: false; retryAfterSeconds: number };
+
+type SavedTrip = {
+  id: string;
+  slug: string;
+  title: string;
+  destination: string;
+  created_at: string;
+};
+
+type BlueprintDay = {
+  day: number;
+  role: string;
+  theme: string;
+  guidance: string;
+};
 
 /** ---------- Helpers ---------- */
 function clamp(n: number, min: number, max: number) {
@@ -155,11 +168,15 @@ function fmtMinutes(mins: number) {
 
 function sanitizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter((v): v is string => typeof v === "string")
-    .map((v) => v.trim())
-    .filter(Boolean)
-    .slice(0, 12);
+
+  return Array.from(
+    new Set(
+      value
+        .filter((v): v is string => typeof v === "string")
+        .map((v) => v.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 12);
 }
 
 function sanitizeOverviewBullets(value: unknown, max = 7): string[] {
@@ -344,10 +361,28 @@ function dedupeStopsWithinDay(stops: ItineraryStop[], destination: string) {
   return out;
 }
 
+function dedupeStopsAcrossTrip(
+  stops: ItineraryStop[],
+  seenTripStops: Set<string>
+): ItineraryStop[] {
+  const out: ItineraryStop[] = [];
+
+  for (const stop of stops) {
+    const key = `${normalizeKey(stop.title)}|${normalizeKey(stop.area) || normalizeKey(stop.mapQuery)}`;
+    if (!key.trim()) continue;
+    if (seenTripStops.has(key)) continue;
+    seenTripStops.add(key);
+    out.push(stop);
+  }
+
+  return out;
+}
+
 function ensureMinimumStops(
   cleanedStops: ItineraryStop[],
   originalStops: ItineraryStop[],
-  minStops: number
+  minStops: number,
+  seenTripStops?: Set<string>
 ) {
   if (cleanedStops.length >= minStops) return cleanedStops;
 
@@ -360,12 +395,311 @@ function ensureMinimumStops(
   for (const stop of originalStops) {
     const key = `${normalizeKey(stop.title)}|${normalizeKey(stop.area)}`;
     if (seen.has(key)) continue;
+
+    if (seenTripStops) {
+      const globalKey = `${normalizeKey(stop.title)}|${normalizeKey(stop.area) || normalizeKey(stop.mapQuery)}`;
+      if (seenTripStops.has(globalKey)) continue;
+      seenTripStops.add(globalKey);
+    }
+
     topUp.push(stop);
     seen.add(key);
     if (topUp.length >= minStops) break;
   }
 
   return topUp;
+}
+
+function buildInterestLabel(safe: SafeRequest) {
+  return safe.interests.length > 0
+    ? safe.interests.join(", ")
+    : "general highlights";
+}
+
+function hasInterest(safe: SafeRequest, term: string) {
+  return safe.interests.some((x) => normalizeKey(x).includes(normalizeKey(term)));
+}
+
+function buildDestinationSpecificGuidance(safe: SafeRequest) {
+  const d = normalizeKey(safe.destination);
+  const city = normalizeKey(safe.city);
+  const target = `${d} ${city}`.trim();
+
+  if (target.includes("medan")) {
+    return [
+      "For Medan, avoid repeating malls and generic restaurants across days.",
+      "Spread days across different styles such as heritage/city highlights, local food areas, family-friendly attractions, local neighbourhood life, religious or cultural sites, parks, and easy-access scenic options.",
+      "Good Medan variety can include Maimun Palace area, Grand Mosque area, Kesawan heritage zone, Merdeka Walk area, Rahmat International Wildlife Museum, Marian Shrine of Annai Velangkanni, family parks, and strong named culinary areas.",
+      "Do not make multiple days feel like 'mall + dinner + market'.",
+      "Do NOT use Lake Toba as a same-day Medan city day trip unless the plan starts very early in the morning and the whole day is built around it.",
+      "For family trips from Medan, prefer Berastagi-style or within-city/near-city options over Lake Toba as a same-day outing.",
+      "Never schedule a Lake Toba departure in the afternoon or evening from Medan.",
+    ].join("\n");
+  }
+
+  if (target.includes("tokyo") || target.includes("japan")) {
+    return [
+      "For Tokyo/Japan trips, spread days across clearly different districts such as Asakusa/Ueno, Shibuya/Harajuku, Shinjuku, Ginza/Tsukiji, Odaiba, Akihabara/Ikebukuro, and one sensible day trip if needed.",
+      "Do not repeat the same type of shrine-shopping-food day across multiple days.",
+    ].join("\n");
+  }
+
+  if (target.includes("singapore")) {
+    return [
+      "For Singapore, spread days across Marina Bay, Sentosa, Chinatown/Tiong Bahru, Orchard/Bugis, Gardens by the Bay, zoo or island/reservoir style options, and hawker-focused food experiences.",
+      "Do not repeat shopping mall style days.",
+    ].join("\n");
+  }
+
+  if (target.includes("bali")) {
+    return [
+      "For Bali, vary days across beach, cliff/coast, rice terrace or nature, temple/culture, cafe or lifestyle zones, family-friendly attractions, and one slower scenic day.",
+      "Do not repeat beach club style days.",
+    ].join("\n");
+  }
+
+  if (target.includes("sydney")) {
+    return [
+      "For Sydney, spread days across Circular Quay/The Rocks, Darling Harbour, Bondi/Eastern Beaches, Manly/Northern Beaches, Surry Hills/City, Inner West/Newtown, and sensible nearby day trips.",
+      "Do not repeat harbour-viewpoint-food days with only minor changes.",
+    ].join("\n");
+  }
+
+  if (target.includes("melbourne")) {
+    return [
+      "For Melbourne, spread days across CBD laneways, Southbank/Arts Precinct, Fitzroy/Collingwood, St Kilda/Bayside, markets/food, gardens or river, and one sensible nearby trip.",
+      "Do not repeat laneway-cafe-shopping days.",
+    ].join("\n");
+  }
+
+  if (target.includes("new york")) {
+    return [
+      "For New York, spread days across Lower Manhattan, Midtown icons, Central Park and museums, Brooklyn, neighbourhood food or culture, skyline or waterfront areas, and one slower local day.",
+      "Do not repeat skyscraper-view-shopping-food days.",
+    ].join("\n");
+  }
+
+  return [
+    "If the destination is a major city, spread days across clearly different neighbourhoods, landmark clusters, food zones, scenic areas, and at most one sensible nearby day trip.",
+    "If the destination is less famous, create variety by changing the day type: heritage, iconic sights, local culture, family fun, nature/scenic, food-focused, neighbourhood exploration, and lighter wrap-up.",
+  ].join("\n");
+}
+
+function isLikelyMedanDestination(safe: SafeRequest) {
+  const target = `${normalizeKey(safe.destination)} ${normalizeKey(safe.city)}`.trim();
+  return target.includes("medan");
+}
+
+function getMaxReasonableDayTripHours(safe: SafeRequest) {
+  const isFamilyTrip = safe.people === "family" || safe.childAges !== "none";
+  if (isFamilyTrip) return 2.5; // one-way practical ceiling
+  return 3;
+}
+
+function buildDayTripRules(safe: SafeRequest) {
+  const maxOneWayHours = getMaxReasonableDayTripHours(safe);
+
+  return [
+    `Nearby day trip rule: only include a day trip if one-way travel is realistically about ${maxOneWayHours} hours or less by normal road/ferry conditions.`,
+    "Do NOT include a day trip that needs very long highway travel each way unless the trip is explicitly designed as an overnight move.",
+    "Do NOT schedule long-distance departures late in the day.",
+    "If a place is too far for a comfortable same-day trip, keep it out of the itinerary.",
+    "For family trips, be stricter about travel time and avoid exhausting same-day return journeys.",
+  ].join("\n");
+}
+
+
+function getRolePool(safe: SafeRequest): Array<{ role: string; theme: string; guidance: string }> {
+  const isFamily = safe.people === "family" || safe.childAges !== "none";
+  const pool: Array<{ role: string; theme: string; guidance: string }> = [
+    {
+      role: "iconic-highlights",
+      theme: "Iconic highlights",
+      guidance:
+        "Focus on the destination's best-known must-see places and strongest first-timer attractions.",
+    },
+    {
+      role: "culture-heritage",
+      theme: "Culture and heritage",
+      guidance:
+        "Use heritage areas, architectural icons, museums, temples/churches/mosques, or historically meaningful places.",
+    },
+    {
+      role: "food-local-life",
+      theme: "Food and local life",
+      guidance:
+        "Center the day around strong local eats, markets, street food, and authentic neighbourhood atmosphere.",
+    },
+    {
+      role: "nature-scenic",
+      theme: "Nature and scenic spots",
+      guidance:
+        "Use parks, waterfronts, lookouts, gardens, beaches, hills, lakes, or scenic day-trip style areas.",
+    },
+    {
+      role: "hidden-gems",
+      theme: "Hidden gems",
+      guidance:
+        "Include lesser-known but worthwhile areas that still feel attractive and memorable.",
+    },
+    {
+      role: "shopping-lifestyle",
+      theme: "Shopping and lifestyle",
+      guidance:
+        "Use one strong shopping or lifestyle area plus nearby food, culture, or scenic stops so the day does not feel like only malls.",
+    },
+    {
+      role: "local-neighbourhoods",
+      theme: "Neighbourhood exploration",
+      guidance:
+        "Focus on distinct local districts, street life, cafes, and an authentic everyday feel.",
+    },
+    {
+      role: "photo-worthy",
+      theme: "Photogenic highlights",
+      guidance:
+        "Favour visually impressive, viral, or skyline/waterfront/photo-friendly places.",
+    },
+    {
+      role: "special-interest",
+      theme: "Special interests day",
+      guidance:
+        "Lean into the strongest requested interests and make the day feel meaningfully different from earlier days.",
+    },
+  ];
+
+  if (hasInterest(safe, "anime")) {
+    pool.push({
+      role: "anime-pop-culture",
+      theme: "Anime and pop culture",
+      guidance:
+        "Use anime, manga, gaming, themed stores, arcades, or pop-culture districts where sensible.",
+    });
+  }
+
+  if (hasInterest(safe, "nightlife")) {
+    pool.push({
+      role: "evening-vibes",
+      theme: "Evening vibes and nightlife",
+      guidance:
+        "Create a day with stronger evening atmosphere, live music, rooftops, bars, or lively night districts where appropriate.",
+    });
+  }
+
+  if (hasInterest(safe, "beaches")) {
+    pool.push({
+      role: "beach-coastal",
+      theme: "Beach and coastal day",
+      guidance:
+        "Use beaches, coastal walks, waterfront relaxation, and scenic seaside stops.",
+    });
+  }
+
+  if (hasInterest(safe, "theme parks") || isFamily) {
+    pool.push({
+      role: "family-fun",
+      theme: "Family fun",
+      guidance:
+        "Use kid-suitable attractions, hands-on stops, easier logistics, breaks, and practical pacing.",
+    });
+  }
+
+  if (hasInterest(safe, "relaxation")) {
+    pool.push({
+      role: "slow-relaxing",
+      theme: "Slow and relaxing day",
+      guidance:
+        "Create a lighter day with scenic cafes, easy walking, pleasant views, restful breaks, and less rushing.",
+    });
+  }
+
+  return pool;
+}
+
+function buildTripBlueprint(safe: SafeRequest): BlueprintDay[] {
+  const isFamily = safe.people === "family" || safe.childAges !== "none";
+  const rolePool = getRolePool(safe);
+
+  const startRole =
+    safe.arrivalTime != null
+      ? {
+          role: "arrival-easy-start",
+          theme: "Easy arrival and nearby highlights",
+          guidance:
+            "Make Day 1 lighter. Stay near the accommodation or easy-access core area. Keep transfers short.",
+        }
+      : {
+          role: "intro-highlights",
+          theme: "Arrival-style city introduction",
+          guidance:
+            "Start with the destination's most rewarding easy-access highlights and set up the rest of the trip.",
+        };
+
+  const endRole =
+    safe.departTime != null
+      ? {
+          role: "wrap-up-departure",
+          theme: "Easy wrap-up and final favourites",
+          guidance:
+            "Keep the final day lighter and practical. Use nearby favourites, easy shopping, or a scenic last stop before departure.",
+        }
+      : {
+  role: "wrap-up-unique-finish",
+  theme: "Unique final day and relaxed finish",
+  guidance:
+    "Do not repeat earlier headline attractions. Use different neighbourhoods, lighter local discoveries, easy shopping, a final food-focused stop, or a calm scenic close that has not already been used.",
+};
+
+  const blueprint: BlueprintDay[] = [];
+  blueprint.push({
+    day: 1,
+    role: startRole.role,
+    theme: startRole.theme,
+    guidance: startRole.guidance,
+  });
+
+  const reusableRoles = rolePool.filter((r) => r.role !== startRole.role);
+  let poolIndex = 0;
+
+  for (let day = 2; day <= safe.days; day++) {
+    const isLast = day === safe.days;
+
+    if (isLast) {
+      blueprint.push({
+        day,
+        role: endRole.role,
+        theme: endRole.theme,
+        guidance: endRole.guidance,
+      });
+      continue;
+    }
+
+    const next = reusableRoles[poolIndex % reusableRoles.length];
+    const themeSuffix =
+      day >= 6 && next.role === "iconic-highlights"
+        ? " (different zone or angle)"
+        : "";
+
+    blueprint.push({
+      day,
+      role: next.role,
+      theme: `${next.theme}${themeSuffix}`,
+      guidance: next.guidance,
+    });
+
+    poolIndex += 1;
+  }
+
+  return blueprint.slice(0, safe.days);
+}
+
+function formatBlueprintForPrompt(days: BlueprintDay[]) {
+  return days
+    .map(
+      (d) =>
+        `Day ${d.day}: ${d.theme} [${d.role}] - ${d.guidance}`
+    )
+    .join("\n");
 }
 
 async function logToGoogleSheets(payload: unknown) {
@@ -671,6 +1005,8 @@ function buildChunkPrompt(params: {
   stopsPerDay: number;
   usedTitles: string[];
   usedAreas: string[];
+  usedThemes: string[];
+  blueprintDays: BlueprintDay[];
 }) {
   const {
     safe,
@@ -681,13 +1017,16 @@ function buildChunkPrompt(params: {
     stopsPerDay,
     usedTitles,
     usedAreas,
+    usedThemes,
+    blueprintDays,
   } = params;
 
-  const interestsText =
-    safe.interests.length > 0 ? safe.interests.join(", ") : "general highlights";
-
+  const interestsText = buildInterestLabel(safe);
   const isFirstChunk = chunkIndex === 0;
   const isLastChunk = chunkIndex === chunkCount - 1;
+  const blueprintText = formatBlueprintForPrompt(blueprintDays);
+  const destinationGuidance = buildDestinationSpecificGuidance(safe);
+  const dayTripRules = buildDayTripRules(safe);
 
   return `
 Create a ${chunkDays}-day itinerary for part ${chunkIndex + 1} of ${chunkCount}.
@@ -704,31 +1043,75 @@ Arrival time: ${isFirstChunk ? safe.arrivalTime ?? "not provided" : "not relevan
 Departure time: ${isLastChunk ? safe.departTime ?? "not provided" : "not relevant"}
 Kids age group: ${safe.childAges}
 
+Trip blueprint for this chunk:
+${blueprintText}
+
 Already used stop titles in earlier chunks:
 ${usedTitles.length ? usedTitles.join(" | ") : "none"}
 
 Already used areas in earlier chunks:
 ${usedAreas.length ? usedAreas.join(" | ") : "none"}
 
+Already used day themes in earlier chunks:
+${usedThemes.length ? usedThemes.join(" | ") : "none"}
+
+Interpret the interests like this:
+- Food = good local eats, famous food spots, markets, snacks, signature dishes
+- Sightseeing = iconic landmarks, must-see areas, city highlights, viewpoints
+- Shopping = famous shopping streets, malls, local retail areas, markets
+- Nature = parks, gardens, scenic lookouts, coastal walks, mountain or lake areas
+- Theme parks = amusement parks, major rides, family entertainment parks
+- Museums = strong museums, galleries, cultural institutions, historic sites
+- Anime = anime, manga, gaming, pop culture, themed stores, arcades
+- Beaches = beaches, waterfront relaxation, coastal activities, scenic seaside areas
+- Night markets = lively evening food/shopping markets and night bazaar style areas
+- Hidden gems = lesser-known but worthwhile places that still feel special
+- Local experiences = neighbourhoods, authentic local areas, culture, street life
+- Family-friendly = easier pacing, kid-suitable attractions, hands-on stops, breaks
+- Nightlife = bars, live music, rooftop areas, late-night districts, evening atmosphere
+- Relaxation = slower pace, scenic cafes, spa-style areas, easy walks, restful stops
+- Instagram spots = photogenic places, viral visuals, pretty streets, skyline/photo views
+
+Destination-specific guidance:
+${destinationGuidance}
+
+Nearby trip realism rules:
+${dayTripRules}
+
 Strict rules:
 - Return JSON ONLY matching the schema exactly.
-- Provide exactly ${stopsPerDay} stops per day.
+- Provide exactly ${stopsPerDay} stops per day before any later filtering.
 - Day numbering inside this chunk must start from 1 and increase by 1.
+- Every day must follow the assigned blueprint day theme and guidance.
 - Use the destination exactly as provided. Do not switch to another city or country unless it is a clearly sensible nearby day trip.
 - Use attractive, recognisable, worthwhile places and activities.
 - Avoid generic filler like "local museum", "market", "park", or "shopping street" unless it is a specifically named and worthwhile venue.
-- Do NOT repeat the same attraction, museum, market, lookout, beach, harbour, bridge walk, food market, or neighbourhood across days.
+- Do NOT repeat the same attraction, museum, market, lookout, beach, harbour, bridge walk, food market, neighbourhood, or mall across days.
 - Do NOT repeat the same venue from earlier chunks.
-- Each day must feel clearly different from the others.
+- Do NOT make multiple days feel like the same pattern with only minor changes.
+- Each day must feel clearly different from the others in both area and day style.
 - For full sightseeing days, include a mix of morning, afternoon, and evening stops.
 - Only make Day 1 lighter if arrivalTime is provided.
 - Only make the final day lighter if departTime is provided.
 - Middle days should feel like full days, not dinner-only or night-only plans.
 - Make it map-friendly: cluster places each day to reduce backtracking.
 - Prefer named, attractive, high-interest stops over vague categories.
+- If interests include Sightseeing, include famous must-see landmarks and recognisable city highlights.
+- If interests include Hidden gems, include at least 1 less-obvious but worthwhile stop on suitable days.
+- If interests include Local experiences, include neighbourhoods or authentic local areas, not only tourist icons.
+- If interests include Family-friendly, favour easier logistics, fun stops, and practical pacing.
+- If interests include Nightlife, include at least one evening-focused stop where suitable.
+- If interests include Relaxation, reduce over-packing and include calmer scenic breaks.
+- If interests include Instagram spots, favour visually attractive places and views.
 - If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
 - Include at least 1 kid-appropriate stop per day when kids age group != none.
 - Keep notes short.
+- Themes must be specific and varied. Avoid repeating generic theme labels like "Best of the city" on multiple days.
+- Do NOT include unrealistic same-day long-distance trips from the base city.
+- Do NOT schedule a far day trip unless departure starts early in the morning and the full day is built around that trip.
+- Never place the start of a major out-of-city drive in the afternoon or evening.
+- For family trips, avoid exhausting out-and-back travel days.
+- If a destination is too far for a comfortable day trip, replace it with a closer option.
 
 SEO requirements:
 - Also create SEO-friendly fields for the whole trip.
@@ -747,10 +1130,6 @@ SEO requirements:
   - "7 Day Tokyo Itinerary for First-Time Visitors (2026)"
   - "5 Day Bali Itinerary for Couples (2026)"
 - Use specific place names where relevant.
-
-Special city guidance:
-- If the destination is Sydney, spread days across clearly different areas such as Circular Quay/The Rocks, Darling Harbour, Bondi/Eastern Beaches, Manly/Northern Beaches, Surry Hills/City, Inner West/Newtown, and sensible nearby day trips.
-- If the destination is a major city, spread days across distinct neighborhoods and iconic nearby areas.
 `.trim();
 }
 
@@ -763,12 +1142,14 @@ async function generateChunk(params: {
   stopsPerDay: number;
   usedTitles: string[];
   usedAreas: string[];
+  usedThemes: string[];
+  blueprintDays: BlueprintDay[];
 }): Promise<ParsedAiItinerary> {
   const prompt = buildChunkPrompt(params);
 
   const parsed = await callModel({
     prompt,
-    maxTokens: 2600,
+    maxTokens: 2800,
   });
 
   const chunk = Array.isArray(parsed.itinerary)
@@ -787,27 +1168,27 @@ async function generateChunk(params: {
 
 export async function POST(req: Request) {
   const { userId } = await auth();
+  const ownerUserId = userId ?? null;
+  const isGuest = !ownerUserId;
 
-  if (!userId) {
-    return NextResponse.json({ error: "Login required" }, { status: 401 });
-  }
+  if (!isGuest) {
+    const lock = await acquireGenerationLock(ownerUserId, 45);
 
-  const lock = await acquireGenerationLock(userId, 45);
-
-  if (!lock.acquired) {
-    return NextResponse.json(
-      {
-        error: `A trip is already being generated. Please wait about ${lock.retryAfterSeconds} seconds and try again.`,
-      },
-      { status: 429 }
-    );
+    if (!lock.acquired) {
+      return NextResponse.json(
+        {
+          error: `A trip is already being generated. Please wait about ${lock.retryAfterSeconds} seconds and try again.`,
+        },
+        { status: 429 }
+      );
+    }
   }
 
   try {
     const supabase = createSupabaseServerClient();
-    const usage = await getUsage(userId);
+    const usage: UsageInfo | null = !isGuest ? await getUsage(ownerUserId) : null;
 
-    if (!usage.allowed) {
+    if (usage && !usage.allowed) {
       const limitLabel =
         usage.limit === Number.POSITIVE_INFINITY
           ? "unlimited"
@@ -878,6 +1259,8 @@ export async function POST(req: Request) {
     const chunkCount =
       dates.length > 0 ? dateChunks.length : Math.ceil(safe.days / chunkSize);
 
+    const blueprint = buildTripBlueprint(safe);
+
     const resolvedChunks: Array<{
       chunkIndex: number;
       chunkDates: string[];
@@ -887,6 +1270,7 @@ export async function POST(req: Request) {
 
     const usedTitles: string[] = [];
     const usedAreas: string[] = [];
+    const usedThemes: string[] = [];
 
     for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
       const chunkDates = dates.length > 0 ? dateChunks[chunkIndex] : [];
@@ -894,6 +1278,12 @@ export async function POST(req: Request) {
         chunkDates.length > 0
           ? chunkDates.length
           : Math.min(chunkSize, safe.days - chunkIndex * chunkSize);
+
+      const startDayNumber = chunkIndex * chunkSize + 1;
+      const endDayNumber = Math.min(safe.days, startDayNumber + chunkDays - 1);
+      const blueprintDays = blueprint.filter(
+        (d) => d.day >= startDayNumber && d.day <= endDayNumber
+      );
 
       const parsedChunk = await generateChunk({
         safe,
@@ -904,6 +1294,8 @@ export async function POST(req: Request) {
         stopsPerDay,
         usedTitles: [...usedTitles],
         usedAreas: [...usedAreas],
+        usedThemes: [...usedThemes],
+        blueprintDays,
       });
 
       const chunk = Array.isArray(parsedChunk.itinerary)
@@ -911,6 +1303,10 @@ export async function POST(req: Request) {
         : [];
 
       for (const day of chunk) {
+        if (typeof day.theme === "string" && day.theme.trim()) {
+          usedThemes.push(day.theme.trim());
+        }
+
         if (Array.isArray(day.stops)) {
           for (const stop of day.stops) {
             if (typeof stop.title === "string" && stop.title.trim()) {
@@ -943,73 +1339,93 @@ export async function POST(req: Request) {
 
       for (let i = 0; i < chunkItinerary.length; i++) {
         const item = chunkItinerary[i];
+        const blueprintDay = blueprint[globalDayNumber - 1];
+
         allGeneratedDays.push({
           ...item,
           day: globalDayNumber,
+          theme:
+            typeof item.theme === "string" && item.theme.trim()
+              ? item.theme.trim()
+              : blueprintDay?.theme ?? `Day ${globalDayNumber}`,
           date:
             resolved.chunkDates[i] ??
             (safe.startDate
               ? addDays(safe.startDate, globalDayNumber - 1)
               : null),
         });
+
         globalDayNumber += 1;
       }
     }
 
-    const itinerary: ItineraryDay[] = allGeneratedDays
-      .slice(0, safe.days)
-      .map((d, idx) => {
-        const rawStops = Array.isArray(d.stops)
-          ? (d.stops as StopWithTime[])
-          : [];
+    const itinerary: ItineraryDay[] = [];
+    const seenTripStops = new Set<string>();
 
-        const isDay1 = idx === 0;
-        const isLastDay = idx === safe.days - 1;
+    for (let idx = 0; idx < allGeneratedDays.slice(0, safe.days).length; idx++) {
+      const d = allGeneratedDays[idx];
+      const rawStops = Array.isArray(d.stops)
+        ? (d.stops as StopWithTime[])
+        : [];
 
-        const fixedStops = enforceDayTimeRules(rawStops, {
-          minStart: isDay1 ? safe.arrivalTime ?? null : null,
-          maxEnd: isLastDay ? safe.departTime ?? null : null,
-        });
+      const isDay1 = idx === 0;
+      const isLastDay = idx === safe.days - 1;
 
-        const normalizedStops: ItineraryStop[] = fixedStops.map((s) => ({
-          time: typeof s.time === "string" ? s.time : "09:00",
-          title: typeof s.title === "string" ? s.title : "Stop",
-          area: typeof s.area === "string" ? s.area : undefined,
-          notes: typeof s.notes === "string" ? s.notes : undefined,
-          mapQuery:
-            typeof s.mapQuery === "string" && s.mapQuery.trim()
-              ? s.mapQuery
-              : `${typeof s.title === "string" ? s.title : "Attraction"}, ${safe.destination}`,
-          costEstimate: Number(s.costEstimate) || 0,
-        }));
-
-        const dedupedStops = dedupeStopsWithinDay(
-          normalizedStops,
-          safe.destination
-        );
-
-        const minStopsForDay =
-          isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
-
-        const cleanedStops = ensureMinimumStops(
-          dedupedStops,
-          normalizedStops,
-          minStopsForDay
-        );
-
-        const dailyCostEstimate = cleanedStops.reduce(
-          (sum, stop) => sum + stop.costEstimate,
-          0
-        );
-
-        return {
-          day: idx + 1,
-          date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
-          theme: d.theme || `Day ${idx + 1}`,
-          stops: cleanedStops,
-          dailyCostEstimate,
-        };
+      const fixedStops = enforceDayTimeRules(rawStops, {
+        minStart: isDay1 ? safe.arrivalTime ?? null : null,
+        maxEnd: isLastDay ? safe.departTime ?? null : null,
       });
+
+      const normalizedStops: ItineraryStop[] = fixedStops.map((s) => ({
+        time: typeof s.time === "string" ? s.time : "09:00",
+        title: typeof s.title === "string" ? s.title : "Stop",
+        area: typeof s.area === "string" ? s.area : undefined,
+        notes: typeof s.notes === "string" ? s.notes : undefined,
+        mapQuery:
+          typeof s.mapQuery === "string" && s.mapQuery.trim()
+            ? s.mapQuery
+            : `${typeof s.title === "string" ? s.title : "Attraction"}, ${safe.destination}`,
+        costEstimate: Number(s.costEstimate) || 0,
+      }));
+
+      const dedupedWithinDay = dedupeStopsWithinDay(
+        normalizedStops,
+        safe.destination
+      );
+
+      const dedupedAcrossTrip = dedupeStopsAcrossTrip(
+        dedupedWithinDay,
+        seenTripStops
+      );
+
+      const minStopsForDay =
+        isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
+
+      const cleanedStops = ensureMinimumStops(
+        dedupedAcrossTrip,
+        normalizedStops,
+        minStopsForDay,
+        seenTripStops
+      );
+
+      const dailyCostEstimate = cleanedStops.reduce(
+        (sum, stop) => sum + stop.costEstimate,
+        0
+      );
+
+      const blueprintDay = blueprint[idx];
+
+      itinerary.push({
+        day: idx + 1,
+        date: safe.startDate ? addDays(safe.startDate, idx) : undefined,
+        theme:
+          typeof d.theme === "string" && d.theme.trim()
+            ? d.theme.trim()
+            : blueprintDay?.theme || `Day ${idx + 1}`,
+        stops: cleanedStops,
+        dailyCostEstimate,
+      });
+    }
 
     const seoSource = resolvedChunks[0]?.parsed;
 
@@ -1024,10 +1440,7 @@ export async function POST(req: Request) {
         ? seoSource.seoDescription.trim()
         : buildSeoDescription(safe);
 
-    const h1 =
-      typeof seoSource?.h1 === "string" && seoSource.h1.trim()
-        ? seoSource.h1.trim()
-        : buildSeoH1(safe);
+    const h1 = buildSeoH1(safe);
 
     const introParagraph =
       typeof seoSource?.introParagraph === "string" &&
@@ -1057,11 +1470,97 @@ export async function POST(req: Request) {
       meta: {
         generatedAt: new Date().toISOString(),
         engine: "openai",
-        model: "chunked:gpt-4o-mini",
+        model: "chunked:gpt-4o-mini-blueprint",
       },
     };
 
-    const tripTitle = h1;
+    if (isGuest) {
+      void logToGoogleSheets({
+        type: "itinerary_preview",
+        destination: safe.destination,
+        city: safe.city ?? "",
+        country: safe.country ?? "",
+        days: safe.days,
+        people: safe.people,
+        budget: safe.budget,
+        pace: safe.pace,
+        startDate: safe.startDate ?? "",
+        arrivalTime: safe.arrivalTime ?? "",
+        departTime: safe.departTime ?? "",
+        childAges: safe.childAges ?? "none",
+        interests: safe.interests,
+        source: "generate_api_openai_gpt4omini_blueprint_preview",
+      });
+
+      return NextResponse.json({
+        ...responseBody,
+        savedTrip: null,
+        usage: null,
+      });
+    }
+
+    const tripTitle = buildSeoH1(safe);
+
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+
+    const { data: recentTrips, error: recentTripsError } = await supabase
+      .from("itineraries")
+      .select("id, slug, title, destination, created_at, raw_prompt")
+      .eq("user_id", ownerUserId)
+      .gte("created_at", oneMinuteAgo)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (recentTripsError) {
+      console.error("Recent trips check error:", recentTripsError);
+    }
+
+    const duplicateTrip = (recentTrips ?? []).find((trip: any) => {
+      try {
+        const existingInput = JSON.parse(trip.raw_prompt || "{}");
+
+        return (
+          existingInput.destination === safe.destination &&
+          existingInput.days === safe.days &&
+          existingInput.people === safe.people &&
+          existingInput.budget === safe.budget &&
+          existingInput.pace === safe.pace &&
+          (existingInput.startDate ?? null) === (safe.startDate ?? null) &&
+          (existingInput.arrivalTime ?? null) === (safe.arrivalTime ?? null) &&
+          (existingInput.departTime ?? null) === (safe.departTime ?? null) &&
+          JSON.stringify(existingInput.interests ?? []) ===
+            JSON.stringify(safe.interests ?? [])
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    const activeUsage = usage as UsageInfo;
+
+    if (duplicateTrip) {
+      return NextResponse.json({
+        ...responseBody,
+        savedTrip: {
+          id: duplicateTrip.id,
+          slug: duplicateTrip.slug,
+          title: duplicateTrip.title,
+          destination: duplicateTrip.destination,
+          created_at: duplicateTrip.created_at,
+        },
+        usage: {
+          plan: activeUsage.plan,
+          used: activeUsage.used,
+          limit:
+            activeUsage.limit === Number.POSITIVE_INFINITY
+              ? "unlimited"
+              : activeUsage.limit,
+          periodKey: activeUsage.periodKey,
+          periodStart: activeUsage.periodStart,
+          periodEnd: activeUsage.periodEnd,
+        },
+      });
+    }
 
     const baseSlug = makeTripSlug({
       destination: safe.destination,
@@ -1086,7 +1585,7 @@ export async function POST(req: Request) {
       .from("itineraries")
       .insert([
         {
-          user_id: userId,
+          user_id: ownerUserId,
           slug,
           title: tripTitle,
           destination: safe.destination,
@@ -1103,9 +1602,9 @@ export async function POST(req: Request) {
         },
       ])
       .select("id, slug, title, destination, created_at")
-      .single();
+      .single<SavedTrip>();
 
-    if (saveError) {
+    if (saveError || !savedTrip) {
       console.error("Supabase save error:", saveError);
       return NextResponse.json(
         { error: "Itinerary generated but failed to save" },
@@ -1113,11 +1612,10 @@ export async function POST(req: Request) {
       );
     }
 
-    await incrementUsage(userId, usage);
+    void incrementUsage(ownerUserId, activeUsage);
+    const nextUsed = activeUsage.used + 1;
 
-    const nextUsed = usage.used + 1;
-
-    await logToGoogleSheets({
+    void logToGoogleSheets({
       type: "itinerary",
       destination: safe.destination,
       city: safe.city ?? "",
@@ -1131,29 +1629,33 @@ export async function POST(req: Request) {
       departTime: safe.departTime ?? "",
       childAges: safe.childAges ?? "none",
       interests: safe.interests,
-      source: "generate_api_openai_gpt4omini_chunked_with_seo",
+      source: "generate_api_openai_gpt4omini_blueprint_with_seo",
       savedTripId: savedTrip.id,
-      clerkUserId: userId,
-      plan: usage.plan,
+      clerkUserId: ownerUserId,
+      plan: activeUsage.plan,
       usageCount: nextUsed,
       usageLimit:
-        usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
-      periodKey: usage.periodKey,
-      periodStart: usage.periodStart,
-      periodEnd: usage.periodEnd,
+        activeUsage.limit === Number.POSITIVE_INFINITY
+          ? "unlimited"
+          : activeUsage.limit,
+      periodKey: activeUsage.periodKey,
+      periodStart: activeUsage.periodStart,
+      periodEnd: activeUsage.periodEnd,
     });
 
     return NextResponse.json({
       ...responseBody,
       savedTrip,
       usage: {
-        plan: usage.plan,
+        plan: activeUsage.plan,
         used: nextUsed,
         limit:
-          usage.limit === Number.POSITIVE_INFINITY ? "unlimited" : usage.limit,
-        periodKey: usage.periodKey,
-        periodStart: usage.periodStart,
-        periodEnd: usage.periodEnd,
+          activeUsage.limit === Number.POSITIVE_INFINITY
+            ? "unlimited"
+            : activeUsage.limit,
+        periodKey: activeUsage.periodKey,
+        periodStart: activeUsage.periodStart,
+        periodEnd: activeUsage.periodEnd,
       },
     });
   } catch (err: unknown) {
@@ -1161,6 +1663,8 @@ export async function POST(req: Request) {
     console.error("Generate route error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
-    await releaseGenerationLock(userId);
+    if (ownerUserId) {
+      await releaseGenerationLock(ownerUserId);
+    }
   }
 }

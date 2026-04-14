@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ShareTripButton from "@/components/ShareTripButton";
 import DownloadImageButton from "@/components/DownloadImageButton";
@@ -62,19 +63,15 @@ function getMeaningfulStayArea(stops: any[], destination: string) {
 
 export default async function TripDetailPage({ params }: TripPageProps) {
   const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/sign-in?redirect_url=/itinerary");
-  }
-
   const supabase = createSupabaseServerClient();
 
-  const { data: trip, error } = await supabase
-    .from("itineraries")
-    .select("*")
-    .eq("id", params.id)
-    .eq("user_id", userId)
-    .single();
+  let tripQuery = supabase.from("itineraries").select("*").eq("id", params.id);
+
+  if (userId) {
+    tripQuery = tripQuery.eq("user_id", userId);
+  }
+
+  const { data: trip, error } = await tripQuery.single();
 
   if (error || !trip) {
     notFound();
@@ -86,6 +83,12 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
   const input = trip.generated_plan?.input ?? {};
   const hasValidStartDate = isValidDateString(input.startDate);
+
+  const isLoggedIn = Boolean(userId);
+  const totalDays = itinerary.length;
+  const visibleDays = isLoggedIn ? totalDays : Math.max(1, Math.ceil(totalDays / 2));
+  const visibleItinerary = itinerary.slice(0, visibleDays);
+  const hiddenItinerary = itinerary.slice(visibleDays);
 
   const editParams = new URLSearchParams();
 
@@ -104,6 +107,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
 
   const editHref = `/?${editParams.toString()}#planner`;
   const tripDestination = cleanText(trip.destination);
+  const signInHref = `/sign-in?redirect_url=/itinerary/${params.id}`;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -181,27 +185,63 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
-              <DownloadImageButton />
+              {isLoggedIn ? (
+                <>
+                  {trip.slug ? <ShareTripButton slug={trip.slug} /> : null}
+                  <DownloadImageButton />
 
-              <a
-                href={editHref}
-                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-              >
-                Edit Trip
-              </a>
+                  <a
+                    href={editHref}
+                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  >
+                    Edit Trip
+                  </a>
 
-              <form action={`/api/trips/${trip.id}/delete`} method="POST">
-                <button
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-                  type="submit"
+                  <form action={`/api/trips/${trip.id}/delete`} method="POST">
+                    <button
+                      className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                      type="submit"
+                    >
+                      Delete Trip
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <Link
+                  href={signInHref}
+                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
-                  Delete Trip
-                </button>
-              </form>
+                  Sign up free to unlock full trip
+                </Link>
+              )}
             </div>
           </div>
         </div>
+
+        {!isLoggedIn ? (
+          <div className="mb-6 rounded-2xl border border-purple-200 bg-purple-50 px-4 py-4">
+            <p className="text-sm font-semibold text-purple-900">
+              You are previewing this trip.
+            </p>
+            <p className="mt-1 text-sm text-purple-800">
+              Sign up free to unlock the full itinerary, edit it, save it, and
+              share it later.
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={signInHref}
+                className="inline-flex rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                Unlock full trip
+              </Link>
+
+              <span className="inline-flex rounded-xl border border-purple-200 bg-white px-4 py-2 text-sm text-purple-800">
+                Free signup
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm font-medium text-amber-900">
@@ -214,7 +254,7 @@ export default async function TripDetailPage({ params }: TripPageProps) {
         </div>
 
         <div className="space-y-8">
-          {itinerary.map((day: any, dayIndex: number) => {
+          {visibleItinerary.map((day: any, dayIndex: number) => {
             const dayStops = Array.isArray(day.stops) ? day.stops : [];
             const meaningfulArea = getMeaningfulStayArea(
               dayStops,
@@ -378,6 +418,61 @@ export default async function TripDetailPage({ params }: TripPageProps) {
               </section>
             );
           })}
+
+          {!isLoggedIn && hiddenItinerary.length > 0 ? (
+            <section className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-50 via-white to-orange-50 p-6 shadow-sm">
+              <div className="pointer-events-none absolute inset-0 backdrop-blur-[2px]" />
+
+              <div className="relative z-10">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    🔒 Unlock the rest of your itinerary
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    You can already preview the first {visibleDays} day
+                    {visibleDays > 1 ? "s" : ""}. Sign up free to see the remaining{" "}
+                    {hiddenItinerary.length} day{hiddenItinerary.length > 1 ? "s" : ""},
+                    edit the plan, and save it to My Trips.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {hiddenItinerary.map((day: any, index: number) => (
+                    <div
+                      key={`locked-${day.day ?? index}`}
+                      className="rounded-2xl border border-gray-200 bg-white/80 p-4 opacity-70 blur-[2px]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            Day {day.day ?? visibleDays + index + 1}
+                            {day.theme ? ` — ${day.theme}` : ""}
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            More stops, route planning, food picks, and budget tips
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-400">Locked</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    href={signInHref}
+                    className="inline-flex rounded-xl bg-gray-900 px-5 py-3 text-sm font-medium text-white hover:opacity-90"
+                  >
+                    Sign up free to unlock full trip
+                  </Link>
+
+                  <span className="inline-flex rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                    Save • Edit • Share • Full access
+                  </span>
+                </div>
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <div className="mt-10 rounded-2xl border border-black/10 bg-gray-50 px-4 py-4">

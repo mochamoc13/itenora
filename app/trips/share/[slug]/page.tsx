@@ -325,7 +325,32 @@ export default async function PublicTripPage({ params }: PageProps) {
     cleanText(seo.introParagraph) ||
     `This itinerary for ${destination || "your destination"} includes day-by-day suggestions, attractions, food stops, and practical planning ideas to make the trip easier.`;
 
-  const overviewBullets = cleanStringArray(seo.overviewBullets);
+ const seoOverviewBullets = cleanStringArray(seo.overviewBullets);
+
+const generatedOverviewBullets = itinerary.map((day: any, index: number) => {
+  const stops = Array.isArray(day?.stops) ? day.stops : [];
+
+  const stopTitles = stops
+    .slice(0, 2)
+    .map((stop: any) => cleanText(stop?.title))
+    .filter(Boolean);
+
+  if (stopTitles.length > 0) {
+    return `Day ${day?.day ?? index + 1}: ${stopTitles.join(" and ")}.`;
+  }
+
+  const theme = cleanText(day?.theme);
+  if (theme) {
+    return `Day ${day?.day ?? index + 1}: Enjoy ${theme.toLowerCase()}.`;
+  }
+
+  return `Day ${day?.day ?? index + 1}: Explore ${destination}.`;
+});
+
+const overviewBullets =
+  seoOverviewBullets.length === itinerary.length && itinerary.length > 0
+    ? seoOverviewBullets
+    : generatedOverviewBullets;
 
   const days =
     typeof input.days === "number"

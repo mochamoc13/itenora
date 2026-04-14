@@ -1,7 +1,14 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import GeneratingLoader from "@/components/GeneratingLoader";
+import {
+  buildBookingAffiliateLink,
+  buildKlookActivityLink,
+  isBookableActivity,
+  isTopAttraction,
+} from "@/lib/affiliate";
 
 type ApiStop = {
   time: string;
@@ -48,13 +55,17 @@ type ApiResponse = {
     model?: string;
     mapsProvider?: string;
   };
-  savedTrip?: SavedTrip;
+  savedTrip?: SavedTrip | null;
   usage?: {
     plan: string;
     used: number;
     limit: number | string;
-  };
+  } | null;
 };
+
+function cleanText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 function gmLink(query: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -90,21 +101,10 @@ function buildAgodaLink(params: {
   url.searchParams.set("destination", destination);
   url.searchParams.set("adults", String(adults));
 
-  if (area) {
-    url.searchParams.set("area", area);
-  }
-
-  if (country) {
-    url.searchParams.set("country", country);
-  }
-
-  if (checkIn) {
-    url.searchParams.set("checkIn", checkIn);
-  }
-
-  if (checkOut) {
-    url.searchParams.set("checkOut", checkOut);
-  }
+  if (area) url.searchParams.set("area", area);
+  if (country) url.searchParams.set("country", country);
+  if (checkIn) url.searchParams.set("checkIn", checkIn);
+  if (checkOut) url.searchParams.set("checkOut", checkOut);
 
   return url.toString();
 }
@@ -126,6 +126,7 @@ function getSuggestedStayArea(destination: string) {
   if (d.includes("auckland")) return "CBD or Viaduct Harbour";
   if (d.includes("kuala lumpur")) return "Bukit Bintang or KLCC";
   if (d.includes("gold coast")) return "Surfers Paradise or Main Beach";
+  if (d.includes("hamburg")) return "Hohenfelde";
 
   return `central ${destination}`;
 }
@@ -145,11 +146,7 @@ function getCountryFromDestination(destination: string) {
   if (d.includes("tokyo") || d.includes("osaka") || d.includes("kyoto")) {
     return "Japan";
   }
-
-  if (d.includes("singapore")) {
-    return "Singapore";
-  }
-
+  if (d.includes("singapore")) return "Singapore";
   if (
     d.includes("sydney") ||
     d.includes("melbourne") ||
@@ -158,28 +155,58 @@ function getCountryFromDestination(destination: string) {
   ) {
     return "Australia";
   }
-
   if (d.includes("seoul") || d.includes("busan") || d.includes("jeju")) {
     return "South Korea";
   }
-
-  if (d.includes("bangkok")) {
-    return "Thailand";
-  }
-
-  if (d.includes("bali") || d.includes("jakarta")) {
-    return "Indonesia";
-  }
-
-  if (d.includes("auckland")) {
-    return "New Zealand";
-  }
-
-  if (d.includes("kuala lumpur")) {
-    return "Malaysia";
-  }
+  if (d.includes("bangkok")) return "Thailand";
+  if (d.includes("bali") || d.includes("jakarta")) return "Indonesia";
+  if (d.includes("auckland")) return "New Zealand";
+  if (d.includes("kuala lumpur")) return "Malaysia";
+  if (d.includes("hong kong")) return "Hong Kong";
+  if (d.includes("hamburg")) return "Germany";
 
   return undefined;
+}
+
+function buildOverviewBullets(itinerary: ApiDay[], destination: string) {
+  return itinerary.map((day, index) => {
+    const stops = Array.isArray(day?.stops) ? day.stops : [];
+
+    const stopTitles = stops
+      .slice(0, 2)
+      .map((stop) => cleanText(stop?.title))
+      .filter(Boolean);
+
+    if (stopTitles.length > 0) {
+      return `Day ${day?.day ?? index + 1}: ${stopTitles.join(" and ")}.`;
+    }
+
+    const theme = cleanText(day?.theme);
+    if (theme) {
+      return `Day ${day?.day ?? index + 1}: Enjoy ${theme.toLowerCase()}.`;
+    }
+
+    return `Day ${day?.day ?? index + 1}: Explore ${destination}.`;
+  });
+}
+
+function buildIntroParagraph(data: ApiResponse) {
+  const destination = data.input.destination || "your destination";
+  const people = data.input.people || "travellers";
+
+  if (people === "family") {
+    return `Discover the vibrant city of ${destination} with this ${data.input.days}-day itinerary perfect for families. Explore culinary delights, natural beauty, and memorable attractions with a plan designed for both adults and children.`;
+  }
+
+  if (people === "couple") {
+    return `Discover ${destination} with this ${data.input.days}-day itinerary designed for couples. Enjoy a balanced mix of attractions, food spots, and memorable moments planned for a smoother trip.`;
+  }
+
+  if (people === "solo") {
+    return `Explore ${destination} with this ${data.input.days}-day itinerary built for solo travellers. Enjoy a smart mix of attractions, food stops, and practical planning suggestions.`;
+  }
+
+  return `Explore ${destination} with this ${data.input.days}-day itinerary featuring attractions, food spots, and practical day-by-day planning ideas.`;
 }
 
 export default function ItineraryClient() {
@@ -208,75 +235,52 @@ export default function ItineraryClient() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [redirecting, setRedirecting] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const hasStartedRef = useRef(false);
 
-    async function run() {
-      setLoading(true);
-      setError(null);
+useEffect(() => {
+  if (hasStartedRef.current) return;
+  hasStartedRef.current = true;
 
-      try {
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+  async function run() {
+    setLoading(true);
+    setError(null);
 
-        const json = await res.json();
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-        if (!res.ok) {
-          throw new Error(json?.error || "Failed to generate itinerary");
-        }
+      const json = await res.json();
 
-        if (!cancelled) {
-          setData(json);
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message || "Something went wrong.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to generate itinerary");
       }
+
+      setData(json);
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Something went wrong.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [payload]);
-
-  const handleOpenSavedTrip = () => {
-    if (!data?.savedTrip?.slug) return;
-
-    setRedirecting(true);
-    window.location.href = `/trips/${encodeURIComponent(data.savedTrip.slug)}`;
-  };
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-4xl p-6">
-        <div className="rounded-2xl border p-6 shadow-sm">
-          <div className="text-xl font-semibold">Generating your itinerary…</div>
-          <div className="mt-2 text-sm text-neutral-600">
-            This usually takes ~5–10 seconds.
-          </div>
-          <div className="mt-6 space-y-3">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-200" />
-            <div className="h-4 w-1/2 animate-pulse rounded bg-neutral-200" />
-            <div className="h-32 w-full animate-pulse rounded bg-neutral-200" />
-          </div>
-        </div>
-      </div>
-    );
   }
+
+  run();
+}, [payload]);
+
+if (loading && !data) {
+  return (
+    <div className="mx-auto max-w-5xl p-6">
+      <GeneratingLoader destination={payload.destination} />
+    </div>
+  );
+}
 
   if (error || !data) {
     return (
@@ -294,178 +298,373 @@ export default function ItineraryClient() {
     );
   }
 
-  const total = data.itinerary.reduce((sum, d) => sum + d.dailyCostEstimate, 0);
+  const isGuest = !data.savedTrip;
   const suggestedArea = getSuggestedStayArea(data.input.destination);
   const country = getCountryFromDestination(data.input.destination);
+  const overviewBullets = buildOverviewBullets(
+    data.itinerary,
+    data.input.destination
+  );
 
   const adults =
     data.input.people === "solo" ? 1 : data.input.people === "couple" ? 2 : 2;
 
-  const hotelLink = buildAgodaLink({
+  const overallAgodaLink = buildAgodaLink({
     destination: data.input.destination,
     area: suggestedArea,
     country,
     checkIn: data.input.startDate,
     checkOut: data.input.startDate
-      ? addDays(data.input.startDate, Math.max(data.input.days - 1, 0))
+      ? addDays(data.input.startDate, Math.max(data.input.days, 1))
       : undefined,
     adults,
   });
 
+  const overallTripLink = buildBookingAffiliateLink({
+    destination: data.input.destination,
+    area: suggestedArea,
+    checkIn: data.input.startDate,
+    checkOut: data.input.startDate
+      ? addDays(data.input.startDate, Math.max(data.input.days, 1))
+      : undefined,
+  });
+
+  const totalDays = data.itinerary.length;
+  const visibleDays = isGuest ? Math.max(1, Math.ceil(totalDays / 2)) : totalDays;
+
   return (
     <div className="mx-auto max-w-5xl p-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">
-            {data.input.days}-day {data.input.destination} ({data.input.budget})
+      <article className="space-y-8">
+        <header className="rounded-3xl border border-black/10 bg-gradient-to-br from-purple-50 via-white to-orange-50 p-6 shadow-sm">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            {data.savedTrip?.title ||
+              `${data.input.days} Day ${data.input.destination} Itinerary`}
           </h1>
 
-          <div className="mt-1 text-sm text-neutral-600">
-            Pace: {data.input.pace} • People: {data.input.people} • Est. total
-            (per person): ~{total}
+          <p className="mt-3 text-base leading-7 text-gray-700">
+            {buildIntroParagraph(data)}
+          </p>
+
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            Updated for 2026 travel. Use this itinerary as a flexible travel
+            guide for what to do, where to go, and how to organise each day
+            more smoothly.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
+            <span className="rounded-full border border-gray-200 bg-white px-3 py-1">
+              {data.input.days} day{data.input.days > 1 ? "s" : ""}
+            </span>
+
+            <span className="rounded-full border border-gray-200 bg-white px-3 py-1">
+              {data.input.budget}
+            </span>
+
+            {data.input.startDate ? (
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-700">
+                Hotel-ready
+              </span>
+            ) : null}
           </div>
+        </header>
 
-          {data.usage ? (
-            <div className="mt-2 text-sm text-neutral-500">
-              Plan: {data.usage.plan} • Used this month: {data.usage.used} /{" "}
-              {data.usage.limit}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <a
-            href={hotelLink}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition hover:bg-orange-100"
-          >
-            Check hotels
-          </a>
-
-          {data.savedTrip?.slug ? (
-            <button
-              className="rounded-xl border px-4 py-2 transition hover:bg-neutral-50 active:scale-95 disabled:opacity-60"
-              onClick={handleOpenSavedTrip}
-              disabled={redirecting}
-            >
-              {redirecting ? "Opening..." : "Open saved trip"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">
-              Stay recommendation
-            </p>
-
-            <h2 className="mt-1 text-xl font-bold text-gray-900">
-              Best area to stay in {data.input.destination}
+        {overviewBullets.length > 0 ? (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {data.input.destination} itinerary overview
             </h2>
 
-            <p className="mt-2 text-sm text-gray-700">
-              For this trip, a practical base would be{" "}
-              <span className="font-semibold">{suggestedArea}</span>. This usually
-              keeps transport easier and makes the day-by-day itinerary smoother.
-            </p>
-          </div>
+            <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+              {overviewBullets.map((item, index) => (
+                <li key={index} className="flex gap-2">
+                  <span className="mt-1 text-gray-400">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
-          <a
-            href={hotelLink}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="inline-flex items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-          >
-            Check price on Agoda
-          </a>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-medium text-amber-900">
+            Tip: Open maps, hotel, or activity links in a new tab so your
+            itinerary stays open.
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            This is especially helpful if you opened the trip from Instagram or
+            Facebook.
+          </p>
         </div>
-      </div>
 
-      {data.savedTrip ? (
-        <div className="mt-6 rounded-2xl border p-4 text-sm text-neutral-600">
-          Trip saved successfully:{" "}
-          <span className="font-medium">{data.savedTrip.title}</span>
-        </div>
-      ) : null}
+        <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 max-w-2xl flex-1">
+              <p className="text-sm font-semibold uppercase tracking-wide text-orange-900">
+                Recommended area
+              </p>
 
-      <div className="mt-6 space-y-6">
-        {data.itinerary.map((day) => (
-          <div key={day.day} className="rounded-2xl border p-5 shadow-sm">
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <div className="text-xl font-semibold">
-                Day {day.day} {day.date ? `• ${day.date}` : ""} — {day.theme}
-              </div>
-              <div className="text-sm text-neutral-600">
-                Daily est: ~{day.dailyCostEstimate}
-              </div>
+              <h2 className="mt-2 text-2xl font-bold text-gray-900">
+                {suggestedArea}
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-orange-900/85">
+                {suggestedArea} is a practical base for this itinerary with
+                easier access to nearby stops.
+              </p>
+
+              <p className="mt-2 text-xs text-gray-600">
+                Use the main hotel button for the best match. Agoda is available
+                as a backup option.
+              </p>
             </div>
 
-            <div className="mt-4 divide-y">
-              {day.stops.map((s, idx) => {
-                const stopHotelLink = buildAgodaLink({
-                  destination: data.input.destination,
-                  area: s.area || suggestedArea,
-                  country,
-                  checkIn: day.date,
-                  checkOut: day.date ? addDays(day.date, 1) : undefined,
-                  adults,
-                });
+            <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[320px]">
+              <a
+                href={overallTripLink}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+              >
+                Find hotels in {suggestedArea}
+              </a>
 
-                return (
-                  <div key={idx} className="py-3">
-                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <div className="font-medium">
-                        {s.time} — {s.title}
-                        {s.area ? (
-                          <span className="text-neutral-500"> • {s.area}</span>
-                        ) : null}
-                      </div>
-                      <div className="text-sm text-neutral-600">
-                        ~{s.costEstimate}
-                      </div>
+              <a
+                href={overallAgodaLink}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="inline-flex items-center justify-center rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+              >
+                More hotel options on Agoda
+              </a>
+
+              <span className="text-xs text-gray-600">
+                Both links open in a new tab
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {data.savedTrip ? (
+          <div className="rounded-2xl border p-4 text-sm text-neutral-600">
+            Trip saved successfully:{" "}
+            <span className="font-medium">{data.savedTrip.title}</span>
+          </div>
+        ) : null}
+
+        {isGuest ? (
+          <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-900">
+            You are viewing a free preview. Sign up free to unlock the full
+            itinerary, save your trip, and edit it later.
+          </div>
+        ) : null}
+
+        <div className="space-y-6">
+          {data.itinerary.map((day, index) => {
+            const isLocked = isGuest && index >= visibleDays;
+
+            const dayArea =
+              day.stops.find((stop) => cleanText(stop.area))?.area || suggestedArea;
+
+            const dayTripLink = buildBookingAffiliateLink({
+              destination: data.input.destination,
+              area: dayArea,
+              checkIn: day.date,
+              checkOut: day.date ? addDays(day.date, 1) : undefined,
+            });
+
+            const dayAgodaLink = buildAgodaLink({
+              destination: data.input.destination,
+              area: dayArea,
+              country,
+              checkIn: day.date,
+              checkOut: day.date ? addDays(day.date, 1) : undefined,
+              adults,
+            });
+
+            return (
+              <section
+                key={day.day}
+                className={`rounded-3xl border border-gray-200 bg-white p-6 shadow-sm transition ${
+                  isLocked ? "pointer-events-none opacity-60 blur-[2px]" : ""
+                }`}
+              >
+                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900">
+                      Day {day.day} — {day.theme}
+                    </h2>
+                    {day.date ? (
+                      <p className="mt-1 text-sm text-gray-500">{day.date}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="text-sm text-gray-500">
+                    Daily est. total: ~{day.dailyCostEstimate}
+                  </div>
+                </div>
+
+                <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 max-w-2xl flex-1">
+                      <p className="text-sm font-semibold text-orange-900">
+                        Recommended area: {dayArea}
+                      </p>
+
+                      <p className="mt-1 text-sm text-orange-800">
+                        {dayArea} is a practical base for this itinerary with
+                        easier access to nearby stops.
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-600">
+                        Search hotels in {dayArea}
+                        {day.date ? ` from ${day.date} to ${addDays(day.date, 1)}` : ""}
+                        .
+                      </p>
                     </div>
 
-                    {s.notes ? (
-                      <div className="mt-1 text-sm text-neutral-600">
-                        {s.notes}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-2 flex flex-wrap gap-4">
+                    <div className="flex w-full shrink-0 flex-col gap-2 lg:w-[280px]">
                       <a
-                        className="text-sm underline"
-                        href={gmLink(s.mapQuery)}
+                        href={dayTripLink}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
                       >
-                        Open on Google Maps
+                        Find hotels in {dayArea}
                       </a>
 
-                      {idx === 0 ? (
-                        <a
-                          className="text-sm font-medium text-orange-700 underline"
-                          href={stopHotelLink}
-                          target="_blank"
-                          rel="noopener noreferrer sponsored"
-                        >
-                          Check nearby hotels
-                        </a>
-                      ) : null}
+                      <a
+                        href={dayAgodaLink}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-flex items-center justify-center rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                      >
+                        Browse Agoda hotels
+                      </a>
+
+                      <span className="text-xs text-gray-600">
+                        Opens in a new tab
+                      </span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+
+                <div className="space-y-4">
+                  {day.stops.map((stop, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-500">
+                            {stop.time || "Anytime"}
+                            {stop.area ? ` • ${stop.area}` : ""}
+                          </div>
+
+                          {isTopAttraction(stop.title) ? (
+                            <div className="mb-1 mt-1 text-xs font-semibold text-red-500">
+                              🔥 Top attraction
+                            </div>
+                          ) : null}
+
+                          <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                            {stop.title || "Recommended stop"}
+                          </h3>
+
+                          {stop.notes ? (
+                            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                              {stop.notes}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="text-sm text-gray-500">
+                          ~{stop.costEstimate ?? 0}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-4">
+                        <a
+                          href={gmLink(
+                            stop.mapQuery ||
+                              `${stop.title || "Stop"}, ${data.input.destination}`
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          Open on Google Maps
+                        </a>
+
+                        {isBookableActivity(stop.title) ? (
+                          <a
+                            href={buildKlookActivityLink(
+                              stop.title,
+                              data.input.destination
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer sponsored"
+                            className={`inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition ${
+                              isTopAttraction(stop.title)
+                                ? "bg-red-500 text-white hover:bg-red-600"
+                                : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                            }`}
+                          >
+                            {isTopAttraction(stop.title)
+                              ? "🔥 Most popular — check price"
+                              : "Check price on Klook"}
+                          </a>
+                        ) : null}
+
+                        <span className="w-full text-xs text-gray-500">
+                          Opens in a new tab so you can keep this itinerary open.
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        {isGuest ? (
+          <div className="rounded-2xl border border-purple-200 bg-purple-50 p-6 text-center">
+            <div className="text-lg font-semibold text-gray-900">
+              🔒 Unlock your full itinerary
+            </div>
+
+            <div className="mt-2 text-sm text-gray-600">
+              Sign up free to see all days, save your trip, edit it later, and
+              come back anytime.
+            </div>
+
+            <div className="mt-3 text-sm text-gray-600">
+              ✨ Full day-by-day plan • 📍 Map links • 💾 Save to My Trips
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <a
+                href="/sign-up"
+                className="rounded-xl bg-black px-6 py-3 text-sm font-medium text-white"
+              >
+                Sign up free
+              </a>
+
+              <a
+                href="/sign-in"
+                className="rounded-xl border px-6 py-3 text-sm font-medium"
+              >
+                Sign in
+              </a>
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="mt-8 rounded-2xl border p-5 text-sm text-neutral-600">
-        Your itinerary has already been saved to your account.
-      </div>
+        ) : (
+          <div className="rounded-2xl border p-5 text-sm text-neutral-600">
+            Your itinerary has already been saved to your account.
+          </div>
+        )}
+      </article>
     </div>
   );
 }

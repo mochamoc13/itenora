@@ -22,6 +22,11 @@ export default function DestinationLookup({
   onChangeText?: (value: string) => void;
 }) {
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const requestIdRef = React.useRef(0);
+  const suppressNextQueryEffectRef = React.useRef(false);
+  const suppressNextLookupRef = React.useRef(false);
+  const autoSelectTimerRef = React.useRef<number | null>(null);
 
   const [query, setQuery] = React.useState(initialValue);
   const [results, setResults] = React.useState<DestinationOption[]>([]);
@@ -30,6 +35,11 @@ export default function DestinationLookup({
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
+    if (suppressNextQueryEffectRef.current) {
+      suppressNextQueryEffectRef.current = false;
+      return;
+    }
+
     setQuery(initialValue);
   }, [initialValue]);
 
@@ -47,9 +57,50 @@ export default function DestinationLookup({
     };
   }, []);
 
+  const clearAutoSelectTimer = React.useCallback(() => {
+    if (autoSelectTimerRef.current !== null) {
+      window.clearTimeout(autoSelectTimerRef.current);
+      autoSelectTimerRef.current = null;
+    }
+  }, []);
+
+  const selectItem = React.useCallback(
+    (item: DestinationOption) => {
+      clearAutoSelectTimer();
+
+      suppressNextQueryEffectRef.current = true;
+      suppressNextLookupRef.current = true;
+
+      setQuery(item.label);
+      setResults([]);
+      setMessage("");
+      setLoading(false);
+      setOpen(false);
+
+      onSelect(item);
+
+      requestAnimationFrame(() => {
+        inputRef.current?.blur();
+      });
+    },
+    [clearAutoSelectTimer, onSelect]
+  );
+
   React.useEffect(() => {
     if (disabled) {
       setOpen(false);
+      setLoading(false);
+      clearAutoSelectTimer();
+      return;
+    }
+
+    if (suppressNextLookupRef.current) {
+      suppressNextLookupRef.current = false;
+      setOpen(false);
+      setLoading(false);
+      setResults([]);
+      setMessage("");
+      clearAutoSelectTimer();
       return;
     }
 
@@ -59,10 +110,14 @@ export default function DestinationLookup({
       setResults([]);
       setMessage("");
       setOpen(false);
+      setLoading(false);
+      clearAutoSelectTimer();
       return;
     }
 
-    const timer = setTimeout(async () => {
+    const currentRequestId = ++requestIdRef.current;
+
+    const timer = window.setTimeout(async () => {
       try {
         setLoading(true);
 
@@ -73,6 +128,8 @@ export default function DestinationLookup({
 
         const data = await res.json();
 
+        if (currentRequestId !== requestIdRef.current) return;
+
         const nextResults = Array.isArray(data?.results) ? data.results : [];
         const nextMessage =
           typeof data?.message === "string" ? data.message : "";
@@ -80,17 +137,57 @@ export default function DestinationLookup({
         setResults(nextResults);
         setMessage(nextMessage);
         setOpen(true);
-      } catch {
-        setResults([]);
-        setMessage("Could not load destination suggestions.");
-        setOpen(true);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
 
-    return () => clearTimeout(timer);
-  }, [query, disabled]);
+        clearAutoSelectTimer();
+
+        // Auto-select the first strong match after a short pause
+        if (
+          nextResults.length > 0 &&
+          trimmed.length >= 3 &&
+          !nextMessage
+        ) {
+          autoSelectTimerRef.current = window.setTimeout(() => {
+            const first = nextResults[0];
+            if (!first) return;
+
+            const firstCity = (first.city || "").trim().toLowerCase();
+            const firstLabel = (first.label || "").trim().toLowerCase();
+            const q = trimmed.toLowerCase();
+
+            const strongMatch =
+              firstCity === q ||
+              firstLabel === q ||
+              firstCity.startsWith(q);
+
+            if (strongMatch) {
+              selectItem(first);
+            }
+          }, 500);
+        }
+      } catch {
+        if (currentRequestId !== requestIdRef.current) return;
+
+        setResults([
+          {
+            label: trimmed,
+            city: trimmed,
+          },
+        ]);
+        setMessage("Press enter to use this destination");
+        setOpen(true);
+        clearAutoSelectTimer();
+      } finally {
+        if (currentRequestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timer);
+      clearAutoSelectTimer();
+    };
+  }, [query, disabled, clearAutoSelectTimer, selectItem]);
 
   const showDropdown =
     open && !disabled && (loading || message.length > 0 || results.length > 0);
@@ -98,9 +195,11 @@ export default function DestinationLookup({
   return (
     <div ref={wrapperRef} className="relative z-30">
       <input
+        ref={inputRef}
         value={query}
         onChange={(e) => {
           const value = e.target.value;
+          clearAutoSelectTimer();
           setQuery(value);
           onChangeText?.(value);
 
@@ -108,12 +207,33 @@ export default function DestinationLookup({
             setOpen(true);
           } else {
             setOpen(false);
+            setResults([]);
+            setMessage("");
           }
         }}
         onFocus={() => {
           if (!disabled && query.trim().length >= 2) {
             setOpen(true);
           }
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+
+          const trimmed = query.trim();
+          if (!trimmed) return;
+
+          e.preventDefault();
+          clearAutoSelectTimer();
+
+          if (results.length > 0) {
+            selectItem(results[0]);
+            return;
+          }
+
+          selectItem({
+            label: trimmed,
+            city: trimmed,
+          });
         }}
         placeholder="Search a city or country"
         autoComplete="off"
@@ -139,12 +259,10 @@ export default function DestinationLookup({
                 key={`${item.label}-${index}`}
                 type="button"
                 className="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
-                onClick={() => {
-                  setQuery(item.label);
-                  setResults([]);
-                  setMessage("");
-                  setOpen(false);
-                  onSelect(item);
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  clearAutoSelectTimer();
+                  selectItem(item);
                 }}
               >
                 <div className="text-sm font-medium text-gray-900">
@@ -154,11 +272,14 @@ export default function DestinationLookup({
               </button>
             ))}
 
-          {!loading && !message && results.length === 0 && query.trim().length >= 2 && (
-            <div className="px-4 py-3 text-sm text-gray-500">
-              No matching destinations found.
-            </div>
-          )}
+          {!loading &&
+            !message &&
+            results.length === 0 &&
+            query.trim().length >= 2 && (
+              <div className="px-4 py-3 text-sm text-gray-500">
+                No matching destinations found.
+              </div>
+            )}
         </div>
       )}
     </div>
