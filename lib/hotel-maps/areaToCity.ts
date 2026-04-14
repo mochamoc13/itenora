@@ -480,7 +480,6 @@ export const AREA_TO_CITY: Record<string, string> = {
   // GENERIC IGNORE
   // =========================
   cbd: "",
-  central: "",
   downtown: "",
   "city centre": "",
   "city center": "",

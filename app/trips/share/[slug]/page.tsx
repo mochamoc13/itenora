@@ -479,13 +479,13 @@ const overviewBullets =
                 : "Itinerary overview"}
             </h2>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-              {overviewBullets.map((item, index) => (
-                <li key={index} className="flex gap-2">
-                  <span className="mt-1 text-gray-400">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+  {overviewBullets.map((item: string, index: number) => (
+    <li key={index} className="flex gap-2">
+      <span className="mt-1 text-gray-400">•</span>
+      <span>{item}</span>
+    </li>
+  ))}
+</ul>
           </section>
         ) : null}
 
