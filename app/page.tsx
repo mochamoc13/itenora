@@ -637,12 +637,11 @@ export default async function Home() {
             </p>
             <p>
               Questions?{" "}
-           <a
-  href="/contact"
-  className="relative inline-block font-semibold text-black no-underline"
+<a
+  href="mailto:support@itenora.com"
+  className="text-blue-600 hover:underline font-medium"
 >
-  <span className="relative z-10">Contact us</span>
-  <span className="absolute left-0 right-0 bottom-[0.08em] h-[0.55em] bg-yellow-300 -z-0 rounded-sm"></span>
+  support@itenora.com
 </a>
             </p>
           </div>
@@ -671,12 +670,11 @@ export default async function Home() {
   <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 text-sm text-gray-600">
     <div>
       Need help?{" "}
-   <a
+<a
   href="mailto:support@itenora.com"
-  className="relative inline-block font-semibold text-black underline underline-offset-2"
+  className="text-blue-600 hover:underline font-medium"
 >
-  <span className="relative z-10">support@itenora.com</span>
-  <span className="absolute left-0 right-0 bottom-[0.08em] h-[0.55em] bg-yellow-300 -z-0 rounded-sm"></span>
+  support@itenora.com
 </a>
     </div>
 
