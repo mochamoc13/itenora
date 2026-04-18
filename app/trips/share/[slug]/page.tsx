@@ -115,13 +115,15 @@ function getCountryFromDestination(destination: string) {
   return "";
 }
 
+
+function getTripDays(input: any, itinerary: any[]) {
+  if (typeof input?.days === "number" && input.days > 0) return input.days;
+  if (Array.isArray(itinerary) && itinerary.length > 0) return itinerary.length;
+  return null;
+}
+
 function buildFallbackTitle(destination: string, input: any, itinerary: any[]) {
-  const days =
-    typeof input?.days === "number"
-      ? input.days
-      : itinerary.length > 0
-        ? itinerary.length
-        : null;
+const days = getTripDays(input, itinerary);
 
   const people = cleanText(input?.people);
   const audience =
@@ -140,9 +142,8 @@ function buildFallbackTitle(destination: string, input: any, itinerary: any[]) {
   return destination ? `${destination} Itinerary` : "Travel Itinerary";
 }
 
-function buildFallbackDescription(destination: string, input: any) {
-  const days =
-    typeof input?.days === "number" && input.days > 0 ? input.days : null;
+function buildFallbackDescription(destination: string, input: any, itinerary: any[]) {
+  const days = getTripDays(input, itinerary);
 
   const people = cleanText(input?.people);
   const audience =
@@ -155,7 +156,7 @@ function buildFallbackDescription(destination: string, input: any) {
           : "for travellers";
 
   if (days && destination) {
-    return `Plan the perfect ${days} day ${destination} itinerary ${audience}. Includes attractions, food spots, and practical day-by-day planning ideas.`;
+    return `Plan the perfect ${days}-day ${destination} itinerary ${audience}. Includes attractions, food spots, and practical day-by-day planning ideas.`;
   }
 
   if (destination) {
@@ -163,6 +164,25 @@ function buildFallbackDescription(destination: string, input: any) {
   }
 
   return "Shared itinerary page on Itenora.";
+}
+
+function containsWrongDayLabel(text: string, actualDays: number | null) {
+  if (!text || !actualDays) return false;
+
+  const normalized = text.toLowerCase();
+
+  for (let i = 1; i <= 30; i++) {
+    if (i === actualDays) continue;
+
+    if (
+      normalized.includes(`${i}-day`) ||
+      normalized.includes(`${i} day`)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function getDayHeading(day: any, index: number) {
@@ -242,15 +262,29 @@ export async function generateMetadata({
   const seo = trip.generated_plan?.seo ?? {};
 
   const destination = cleanText(trip.destination || input.destination || "");
-  const h1 =
-    cleanText(seo.h1) ||
-    cleanText(trip.title) ||
-    buildFallbackTitle(destination, input, itinerary);
+const days = getTripDays(input, itinerary);
 
-  const seoTitle = cleanText(seo.seoTitle) || cleanText(trip.title) || h1;
-  const seoDescription =
-    cleanText(seo.seoDescription) ||
-    buildFallbackDescription(destination, input);
+const fallbackTitle = buildFallbackTitle(destination, input, itinerary);
+const fallbackDescription = buildFallbackDescription(destination, input, itinerary);
+
+const rawH1 = cleanText(seo.h1);
+const rawSeoTitle = cleanText(seo.seoTitle);
+const rawSeoDescription = cleanText(seo.seoDescription);
+
+const h1 =
+  rawH1 && !containsWrongDayLabel(rawH1, days)
+    ? rawH1
+    : cleanText(trip.title) || fallbackTitle;
+
+const seoTitle =
+  rawSeoTitle && !containsWrongDayLabel(rawSeoTitle, days)
+    ? rawSeoTitle
+    : cleanText(trip.title) || h1;
+
+const seoDescription =
+  rawSeoDescription && !containsWrongDayLabel(rawSeoDescription, days)
+    ? rawSeoDescription
+    : fallbackDescription;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
   const canonicalUrl = `${siteUrl}/trips/share/${params.slug}`;
@@ -315,16 +349,18 @@ export default async function PublicTripPage({ params }: PageProps) {
 
   const destination = cleanText(trip.destination || input.destination || "");
   const tripCountry = getCountryFromDestination(destination);
+const days = getTripDays(input, itinerary);
 
-  const title =
-    cleanText(seo.h1) ||
-    cleanText(trip.title) ||
-    buildFallbackTitle(destination, input, itinerary);
+ const rawTitle = cleanText(seo.h1);
 
-  const introParagraph =
-    cleanText(seo.introParagraph) ||
-    `This itinerary for ${destination || "your destination"} includes day-by-day suggestions, attractions, food stops, and practical planning ideas to make the trip easier.`;
+const title =
+  rawTitle && !containsWrongDayLabel(rawTitle, days)
+    ? rawTitle
+    : cleanText(trip.title) || buildFallbackTitle(destination, input, itinerary);
 
+const introParagraph = days
+  ? `Discover the magic of ${destination || "your destination"} with this ${days}-day family itinerary. Perfect for parents and kids alike, this plan features a blend of iconic sights and enjoyable activities that cater to all ages.`
+  : `Discover the magic of ${destination || "your destination"} with this itinerary.`;
  const seoOverviewBullets = cleanStringArray(seo.overviewBullets);
 
 const generatedOverviewBullets = itinerary.map((day: any, index: number) => {
@@ -352,12 +388,7 @@ const overviewBullets =
     ? seoOverviewBullets
     : generatedOverviewBullets;
 
-  const days =
-    typeof input.days === "number"
-      ? input.days
-      : itinerary.length > 0
-        ? itinerary.length
-        : null;
+  
 
   const people = cleanText(input.people);
   const adults = people === "solo" ? 1 : people === "couple" ? 2 : 2;
@@ -407,9 +438,11 @@ const overviewBullets =
     "@context": "https://schema.org",
     "@type": "TravelItinerary",
     name: title,
-    description:
-      cleanText(seo.seoDescription) ||
-      `Travel itinerary for ${destination || "your destination"}`,
+ description:
+  cleanText(seo.seoDescription) &&
+  !containsWrongDayLabel(cleanText(seo.seoDescription), days)
+    ? cleanText(seo.seoDescription)
+    : buildFallbackDescription(destination, input, itinerary),
     url: `${siteUrl}/trips/share/${params.slug}`,
     itinerary: itinerary.map((day: any, index: number) => ({
       "@type": "ListItem",
