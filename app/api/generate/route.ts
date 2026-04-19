@@ -700,6 +700,62 @@ function getRolePool(safe: SafeRequest): Array<{ role: string; theme: string; gu
   return pool;
 }
 
+function buildSeasonalGuidance(safe: SafeRequest) {
+  const month = safe.startDate ? new Date(`${safe.startDate}T00:00:00`).getMonth() + 1 : null;
+  const destination = normalizeKey(safe.destination);
+  const city = normalizeKey(safe.city);
+  const country = normalizeKey(safe.country);
+  const target = `${destination} ${city} ${country}`.trim();
+
+  if (month == null) {
+    return "If travel month is unknown, use only general seasonal hints and do not force season-specific activities.";
+  }
+
+  const isAustralia = target.includes("australia") || target.includes("melbourne") || target.includes("victoria");
+  const isJapan = target.includes("japan") || target.includes("tokyo") || target.includes("osaka") || target.includes("kyoto");
+  const isBali = target.includes("bali") || target.includes("indonesia");
+
+  if (isAustralia && month >= 6 && month <= 8) {
+    return [
+      "Australia winter rule: June-August is winter.",
+      "For Melbourne or Victoria winter trips, strongly prioritise alpine and snow experiences such as Mt Buller, Mt Baw Baw, Lake Mountain, Mt Hotham, or Falls Creek where trip length allows.",
+      "For trips longer than 5 days, include at least one full-day or overnight alpine/snow experience unless the user clearly prefers city-only travel.",
+      "Do not make the whole trip beach-heavy in Melbourne winter.",
+      "If an alpine destination needs long travel, treat it as a full-day or overnight trip rather than splitting it into a partial day."
+    ].join("\n");
+  }
+
+  if (isJapan && month >= 3 && month <= 4) {
+    return [
+      "Japan spring rule: March-April is strong sakura season in many regions.",
+      "Where sensible, include cherry blossom parks, riversides, gardens, or seasonal flower viewing."
+    ].join("\n");
+  }
+
+  if (isJapan && month >= 11 && month <= 12) {
+    return [
+      "Japan late autumn rule: November-December is strong autumn foliage season in many regions.",
+      "Where sensible, include gardens, temple grounds, parks, or scenic foliage areas."
+    ].join("\n");
+  }
+
+if (isBali && (month >= 11 || month <= 3)) {
+    return [
+      "Bali wet season rule: roughly November-March can be rainier.",
+      "Reduce overpacked outdoor-only days and include flexible indoor-friendly food, spa, culture, cafe, or light sightseeing options."
+    ].join("\n");
+  }
+
+  if (isBali && month >= 4 && month <= 10) {
+    return [
+      "Bali dry season rule: roughly April-October is better for outdoor-heavy sightseeing.",
+      "Beach, coastal, scenic, rice terrace, and outdoor sunset days are more suitable."
+    ].join("\n");
+  }
+
+  return "Use local season implied by the travel month to make the itinerary feel seasonally smart and realistic.";
+}
+
 function buildTripBlueprint(safe: SafeRequest): BlueprintDay[] {
   const isFamily = safe.people === "family" || safe.childAges !== "none";
   const rolePool = getRolePool(safe);
@@ -1111,6 +1167,7 @@ function buildChunkPrompt(params: {
   const blueprintText = formatBlueprintForPrompt(blueprintDays);
   const destinationGuidance = buildDestinationSpecificGuidance(safe);
   const dayTripRules = buildDayTripRules(safe);
+  const seasonalGuidance = buildSeasonalGuidance(safe);
   const travelMonth =
   safe.startDate
     ? new Date(safe.startDate).toLocaleString("en-US", { month: "long" })
@@ -1167,6 +1224,9 @@ ${destinationGuidance}
 Nearby trip realism rules:
 ${dayTripRules}
 
+Seasonal guidance:
+${seasonalGuidance}
+
 Strict rules:
 - Return JSON ONLY matching the schema exactly.
 - Provide exactly ${stopsPerDay} stops per day before any later filtering.
@@ -1195,6 +1255,9 @@ Strict rules:
 - Make it map-friendly: cluster places each day to reduce backtracking.
 - Make the trip flow logically across days, not just within each day.
 - If two days naturally belong to the same base area, keep them adjacent instead of revisiting that area later.
+- If seasonal activities are strongly relevant for the destination and month, include at least one such activity or day.
+- For Melbourne or Victoria trips in June-August, prefer at least one snow or alpine experience on trips longer than 5 days unless the trip is clearly city-only.
+- If a seasonal highlight requires substantial travel, make it a full-day or overnight plan instead of forcing it into a short city day.
 - Prefer a zone-by-zone flow across the trip.
 - Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
 - Major theme parks such as Universal Studios or Disneyland should usually take a full day, especially for families.
@@ -1245,7 +1308,16 @@ Strict rules:
 - HARD CONSTRAINT: In summer destinations, prioritize outdoor activities, beaches, nature, and extended daylight usage.
 - HARD CONSTRAINT: In tropical destinations (e.g. Bali), consider rainy vs dry season and avoid outdoor-heavy plans during heavy rain periods.
 - HARD CONSTRAINT: Do NOT suggest activities that are unrealistic for the season (e.g. beach day in winter, skiing in summer).
+- If destination is in Australia and travel month is June–August:
+  MUST include at least one alpine/snow experience 
+  (e.g., Mt Buller, Mt Baw Baw, Lake Mountain, Falls Creek, Mt Hotham).
 
+- For trips longer than 5 days:
+  include 1 overnight stay OR 1 full-day trip to a snow destination.
+
+- Prioritise the closest ski resort from the base city.
+- If seasonal experience requires long travel (>2.5 hours),
+  group into a full-day or overnight trip instead of splitting across days.
 
 SEO requirements:
 - Also create SEO-friendly fields for the whole trip.
