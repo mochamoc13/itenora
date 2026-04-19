@@ -347,6 +347,36 @@ function enforceDayTimeRules(
   });
 }
 
+function enforceOneWayAreaFlow(stops: ItineraryStop[]) {
+  if (stops.length <= 2) return stops;
+
+  let currentArea = stops[0].area;
+  let switched = false;
+
+  const result: ItineraryStop[] = [];
+
+  for (const stop of stops) {
+    if (!stop.area) {
+      result.push(stop);
+      continue;
+    }
+
+    if (stop.area !== currentArea) {
+      if (switched) {
+        // ❌ second switch → skip (prevents going back)
+        continue;
+      }
+
+      switched = true;
+      currentArea = stop.area;
+    }
+
+    result.push(stop);
+  }
+
+  return result;
+}
+
 function dedupeStopsWithinDay(stops: ItineraryStop[], destination: string) {
   const seen = new Set<string>();
   const out: ItineraryStop[] = [];
@@ -1444,10 +1474,12 @@ export async function POST(req: Request) {
         costEstimate: Number(s.costEstimate) || 0,
       }));
 
-      const dedupedWithinDay = dedupeStopsWithinDay(
-        normalizedStops,
-        safe.destination
-      );
+   const flowedStops = enforceOneWayAreaFlow(normalizedStops);
+
+const dedupedWithinDay = dedupeStopsWithinDay(
+  flowedStops,
+  safe.destination
+);
 
       const dedupedAcrossTrip = dedupeStopsAcrossTrip(
         dedupedWithinDay,
