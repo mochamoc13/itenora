@@ -1115,6 +1115,9 @@ Strict rules:
 - Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
 - Major theme parks such as Universal Studios or Disneyland should usually take a full day, especially for families.
 - Do not schedule another major attraction after a full-day theme park.
+- Only allow a light nearby evening stop after a full-day theme park, such as dinner or a short walk.
+- If an activity is inside a major attraction (e.g. Universal Studios, Disneyland),
+  do NOT list it as a separate time block. Merge it into the main activity.
 - Large aquariums, major zoos, major museums, and extensive heritage complexes should usually be treated as half-day anchors.
 - Avoid unrealistic short durations for major attractions.
 - If a stop would normally take half a day or more, build the rest of the day around it sensibly.
