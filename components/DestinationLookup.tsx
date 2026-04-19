@@ -10,6 +10,25 @@ type DestinationOption = {
   lng?: number;
 };
 
+function formatInputValue(item: DestinationOption) {
+  const city = (item.city || "").trim();
+  const country = (item.country || "").trim();
+
+  if (city && country) return `${city}, ${country}`;
+  if (city) return city;
+  if (country) return country;
+  return item.label;
+}
+
+function formatSecondaryLabel(item: DestinationOption) {
+  const city = (item.city || "").trim();
+  const country = (item.country || "").trim();
+
+  if (city && country) return `${city}, ${country}`;
+  if (country) return country;
+  return item.label;
+}
+
 export default function DestinationLookup({
   initialValue = "",
   disabled = false,
@@ -26,13 +45,13 @@ export default function DestinationLookup({
   const requestIdRef = React.useRef(0);
   const suppressNextQueryEffectRef = React.useRef(false);
   const suppressNextLookupRef = React.useRef(false);
-  const autoSelectTimerRef = React.useRef<number | null>(null);
 
   const [query, setQuery] = React.useState(initialValue);
   const [results, setResults] = React.useState<DestinationOption[]>([]);
   const [open, setOpen] = React.useState(false);
   const [message, setMessage] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState<number>(-1);
 
   React.useEffect(() => {
     if (suppressNextQueryEffectRef.current) {
@@ -48,6 +67,7 @@ export default function DestinationLookup({
       if (!wrapperRef.current) return;
       if (!wrapperRef.current.contains(event.target as Node)) {
         setOpen(false);
+        setHighlightedIndex(-1);
       }
     }
 
@@ -57,40 +77,37 @@ export default function DestinationLookup({
     };
   }, []);
 
-  const clearAutoSelectTimer = React.useCallback(() => {
-    if (autoSelectTimerRef.current !== null) {
-      window.clearTimeout(autoSelectTimerRef.current);
-      autoSelectTimerRef.current = null;
-    }
-  }, []);
-
   const selectItem = React.useCallback(
     (item: DestinationOption) => {
-      clearAutoSelectTimer();
-
       suppressNextQueryEffectRef.current = true;
       suppressNextLookupRef.current = true;
 
-      setQuery(item.label);
+      const displayValue = formatInputValue(item);
+
+      setQuery(displayValue);
       setResults([]);
       setMessage("");
       setLoading(false);
       setOpen(false);
+      setHighlightedIndex(-1);
 
+      onChangeText?.(displayValue);
       onSelect(item);
 
       requestAnimationFrame(() => {
         inputRef.current?.blur();
       });
     },
-    [clearAutoSelectTimer, onSelect]
+    [onChangeText, onSelect]
   );
 
   React.useEffect(() => {
     if (disabled) {
       setOpen(false);
       setLoading(false);
-      clearAutoSelectTimer();
+      setResults([]);
+      setMessage("");
+      setHighlightedIndex(-1);
       return;
     }
 
@@ -100,7 +117,7 @@ export default function DestinationLookup({
       setLoading(false);
       setResults([]);
       setMessage("");
-      clearAutoSelectTimer();
+      setHighlightedIndex(-1);
       return;
     }
 
@@ -111,7 +128,7 @@ export default function DestinationLookup({
       setMessage("");
       setOpen(false);
       setLoading(false);
-      clearAutoSelectTimer();
+      setHighlightedIndex(-1);
       return;
     }
 
@@ -137,33 +154,7 @@ export default function DestinationLookup({
         setResults(nextResults);
         setMessage(nextMessage);
         setOpen(true);
-
-        clearAutoSelectTimer();
-
-        // Auto-select the first strong match after a short pause
-        if (
-          nextResults.length > 0 &&
-          trimmed.length >= 3 &&
-          !nextMessage
-        ) {
-          autoSelectTimerRef.current = window.setTimeout(() => {
-            const first = nextResults[0];
-            if (!first) return;
-
-            const firstCity = (first.city || "").trim().toLowerCase();
-            const firstLabel = (first.label || "").trim().toLowerCase();
-            const q = trimmed.toLowerCase();
-
-            const strongMatch =
-              firstCity === q ||
-              firstLabel === q ||
-              firstCity.startsWith(q);
-
-            if (strongMatch) {
-              selectItem(first);
-            }
-          }, 500);
-        }
+        setHighlightedIndex(nextResults.length > 0 ? 0 : -1);
       } catch {
         if (currentRequestId !== requestIdRef.current) return;
 
@@ -173,9 +164,9 @@ export default function DestinationLookup({
             city: trimmed,
           },
         ]);
-        setMessage("Press enter to use this destination");
+        setMessage("Press Enter to use exactly what you typed.");
         setOpen(true);
-        clearAutoSelectTimer();
+        setHighlightedIndex(0);
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setLoading(false);
@@ -185,9 +176,8 @@ export default function DestinationLookup({
 
     return () => {
       window.clearTimeout(timer);
-      clearAutoSelectTimer();
     };
-  }, [query, disabled, clearAutoSelectTimer, selectItem]);
+  }, [query, disabled]);
 
   const showDropdown =
     open && !disabled && (loading || message.length > 0 || results.length > 0);
@@ -199,8 +189,8 @@ export default function DestinationLookup({
         value={query}
         onChange={(e) => {
           const value = e.target.value;
-          clearAutoSelectTimer();
           setQuery(value);
+          setHighlightedIndex(-1);
           onChangeText?.(value);
 
           if (value.trim().length >= 2) {
@@ -217,16 +207,46 @@ export default function DestinationLookup({
           }
         }}
         onKeyDown={(e) => {
-          if (e.key !== "Enter") return;
-
           const trimmed = query.trim();
+
+          if (e.key === "ArrowDown") {
+            if (!showDropdown || results.length === 0) return;
+            e.preventDefault();
+            setHighlightedIndex((prev) =>
+              prev < results.length - 1 ? prev + 1 : prev
+            );
+            return;
+          }
+
+          if (e.key === "ArrowUp") {
+            if (!showDropdown || results.length === 0) return;
+            e.preventDefault();
+            setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+            return;
+          }
+
+          if (e.key === "Escape") {
+            setOpen(false);
+            setHighlightedIndex(-1);
+            return;
+          }
+
+          if (e.key !== "Enter") return;
           if (!trimmed) return;
 
           e.preventDefault();
-          clearAutoSelectTimer();
 
-          if (results.length > 0) {
-            selectItem(results[0]);
+          if (
+            showDropdown &&
+            results.length > 0 &&
+            highlightedIndex >= 0 &&
+            highlightedIndex < results.length
+          ) {
+            selectItem(results[highlightedIndex]);
+            return;
+          }
+
+          if (showDropdown && results.length > 0) {
             return;
           }
 
@@ -235,7 +255,7 @@ export default function DestinationLookup({
             city: trimmed,
           });
         }}
-        placeholder="Search a city or country"
+        placeholder="Search city or country (e.g. Tokyo, Bali, London)"
         autoComplete="off"
         disabled={disabled}
         className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
@@ -254,23 +274,37 @@ export default function DestinationLookup({
           )}
 
           {!loading &&
-            results.map((item, index) => (
-              <button
-                key={`${item.label}-${index}`}
-                type="button"
-                className="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  clearAutoSelectTimer();
-                  selectItem(item);
-                }}
-              >
-                <div className="text-sm font-medium text-gray-900">
-                  {item.city || item.country || item.label}
-                </div>
-                <div className="mt-1 text-xs text-gray-500">{item.label}</div>
-              </button>
-            ))}
+            results.map((item, index) => {
+              const primary =
+                (item.city || "").trim() ||
+                (item.country || "").trim() ||
+                item.label;
+              const secondary = formatSecondaryLabel(item);
+
+              return (
+                <button
+                  key={`${item.label}-${index}`}
+                  type="button"
+                  className={`block w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 ${
+                    highlightedIndex === index ? "bg-gray-50" : "hover:bg-gray-50"
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectItem(item);
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                >
+                  <div className="text-sm font-medium text-gray-900">
+                    {primary}
+                  </div>
+                  {secondary && secondary !== primary ? (
+                    <div className="mt-1 text-xs text-gray-500">
+                      {secondary}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
 
           {!loading &&
             !message &&

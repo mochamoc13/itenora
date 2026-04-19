@@ -1255,98 +1255,94 @@ Strict rules:
 - Day numbering inside this chunk must start from 1 and increase by 1.
 - Every day must follow the assigned blueprint day theme and guidance.
 - Use the destination exactly as provided. Do not switch to another city or country unless it is a clearly sensible nearby day trip.
+
+Trip quality:
 - Use attractive, recognisable, worthwhile places and activities.
-- Avoid generic filler like "local museum", "market", "park", or "shopping street" unless it is a specifically named and worthwhile venue.
-- Do NOT repeat the same attraction, museum, market, lookout, beach, harbour, bridge walk, food market, neighbourhood, or mall across days.
+- Avoid vague filler such as "local museum", "market", "park", or "shopping street" unless it is a specifically named and worthwhile venue.
+- Prefer named, high-interest places over generic categories.
+- Each day must feel clearly different from the others in both area and experience type.
+- Do NOT repeat the same attraction, venue, neighbourhood, market, lookout, beach, harbour, mall, or museum across days.
 - Do NOT repeat the same venue from earlier chunks.
-- Do NOT make multiple days feel like the same pattern with only minor changes.
-- Each day must feel clearly different from the others in both area and day style.
-- For full sightseeing days, include a mix of morning, afternoon, and evening stops.
+- Do NOT create more than 2 "food + cafe + market" style days in the whole trip.
+- Themes must be specific and varied. Avoid generic repeated themes like "Best of the city".
+
+Flow and geography:
+- Make the trip flow logically across days, not just within each day.
+- Make each day map-friendly by clustering nearby places and reducing backtracking.
+- Prefer a zone-by-zone flow across the trip.
 - Group itinerary into 1–2 accommodation bases for the entire trip.
 - Stay in each base for at least 2 consecutive days.
 - Do NOT switch base every day unless absolutely necessary.
 - Each day must be planned around the current base location.
-- HARD CONSTRAINT: Prefer one accommodation base for the first half of the trip and one accommodation base for the second half of the trip.
-- HARD CONSTRAINT: Do not recommend returning to a previous accommodation base later in the itinerary after moving to a new base.
-- HARD CONSTRAINT: If Days 1 and 2 are in the same zone, keep the recommended hotel area the same unless there is a strong reason to move.
-- HARD CONSTRAINT: For Bali, prefer a clean progression such as Uluwatu/South Bali -> Seminyak-Canggu -> Ubud, or Ubud -> Seminyak-Canggu, instead of bouncing back and forth.
-- HARD CONSTRAINT: When changing to a new base area, the rest of that day and the following day should mainly stay around that new base.
+- Do not recommend returning to a previous accommodation base later in the itinerary after moving to a new base.
+- If two days naturally belong to the same base area, keep them adjacent instead of revisiting that area later.
+- When changing to a new base area, the rest of that day and the following day should mainly stay around that new base.
+- Do NOT schedule more than 2 different areas in one day.
+- Prefer all stops to be in the same district or adjacent districts.
+- Do not bounce between opposite areas on different days if those places could be grouped together earlier.
+- Each day should feel like a continuous journey, not a list of disconnected stops.
+
+Timing and realism:
+- Middle days should feel like full days, not dinner-only or night-only plans.
 - Only make Day 1 lighter if arrivalTime is provided.
 - Only make the final day lighter if departTime is provided.
-- Middle days should feel like full days, not dinner-only or night-only plans.
-- Make it map-friendly: cluster places each day to reduce backtracking.
-- Make the trip flow logically across days, not just within each day.
-- If two days naturally belong to the same base area, keep them adjacent instead of revisiting that area later.
-- If seasonal activities are strongly relevant for the destination and month, include at least one such activity or day.
-HARD CONSTRAINT:
-If destination is Melbourne or Victoria and month is June–August:
-- MUST include at least one snow/alpine day (Mt Buller, Mt Hotham, Lake Mountain, Falls Creek)
-- MUST allocate a FULL day (minimum 6–8 hours)
-- MUST start early morning (~07:00–08:00)
-- If a seasonal highlight requires substantial travel, make it a full-day or overnight plan instead of forcing it into a short city day.
-- Prefer a zone-by-zone flow across the trip.
-- Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
-- Major theme parks such as Universal Studios or Disneyland should usually take a full day, especially for families.
-- HARD CONSTRAINT: If a major anchor attraction (theme park, large zoo, major aquarium, full-day tour) is included:
-  - It MUST take at least 6 hours of the schedule.
-  - Do NOT schedule another major attraction on the same day.
-  - Only allow 1–2 nearby minor activities after it (e.g. dinner, short walk).
+- Total realistic day duration should be about 8–10 active hours.
+- Do not compress multiple large attractions into a short time window.
+- If an attraction is described as full-day, it must not end before late afternoon (~16:00–18:00).
+- Gaps between consecutive stops should normally be between 1.5 to 3 hours.
+- Avoid large idle gaps longer than 4 hours unless explicitly a rest break or travel segment.
 
-- HARD CONSTRAINT: Do NOT include more than ONE major anchor attraction per day.
-HARD CONSTRAINT:
-Do NOT create more than 2 "food + cafe + market" style days in the entire trip.
-Each day must introduce a distinctly different experience type.
+Anchor attractions:
+- Do NOT include more than ONE major anchor attraction per day.
+- A major anchor attraction includes theme parks, large zoos, major aquariums, full-day tours, and other attractions that normally dominate a day.
+- If a major anchor attraction is included, it MUST take at least 6 hours of the schedule.
+- Do NOT schedule another major attraction on the same day as a full-day anchor.
+- Only allow 1–2 nearby minor activities after a full-day anchor, such as dinner or a short walk.
+- If an activity is inside a major attraction (for example Universal Studios or Disneyland), do NOT list it as a separate time block. Merge it into the main attraction.
+- Large aquariums, major zoos, major museums, and extensive heritage complexes should usually be treated as half-day anchors, not quick stops.
 
-- HARD CONSTRAINT: Do NOT schedule more than 2 different areas in one day.
-  - Prefer all stops to be in the same district or adjacent districts.
-
-- HARD CONSTRAINT: Total realistic day duration must be between 8–10 hours.
-  - Do not compress multiple large attractions into a short time window.
-
-- HARD CONSTRAINT: If an attraction is described as "full day", it must NOT end before late afternoon (~16:00–18:00).
-- Do not schedule another major attraction after a full-day theme park.
-- Only allow a light nearby evening stop after a full-day theme park, such as dinner or a short walk.
-- If an activity is inside a major attraction (e.g. Universal Studios, Disneyland),
-  do NOT list it as a separate time block. Merge it into the main activity.
-- Large aquariums, major zoos, major museums, and extensive heritage complexes should usually be treated as half-day anchors.
-- Avoid unrealistic short durations for major attractions.
-- If a stop would normally take half a day or more, build the rest of the day around it sensibly.
-- When recommending a stay area, keep the next major stops aligned with that area instead of suggesting unnecessary return travel later in the trip.
-- Prefer named, attractive, high-interest stops over vague categories.
-- If interests include Sightseeing, include famous must-see landmarks and recognisable city highlights.
-- If interests include Hidden gems, include at least 1 less-obvious but worthwhile stop on suitable days.
-- If interests include Local experiences, include neighbourhoods or authentic local areas, not only tourist icons.
-- If interests include Family-friendly, favour easier logistics, fun stops, and practical pacing.
-- If interests include Nightlife, include at least one evening-focused stop where suitable.
-- If interests include Relaxation, reduce over-packing and include calmer scenic breaks.
-- If interests include Instagram spots, favour visually attractive places and views.
-- If kids age group is baby/toddler/kids: stroller-friendly, shorter travel hops, include breaks, early dinner, avoid late-night activities.
-- Include at least 1 kid-appropriate stop per day when kids age group != none.
-- Keep notes short.
-- Themes must be specific and varied. Avoid repeating generic theme labels like "Best of the city" on multiple days.
+Distance and day trips:
 - Do NOT include unrealistic same-day long-distance trips from the base city.
 - Do NOT schedule a far day trip unless departure starts early in the morning and the full day is built around that trip.
 - Never place the start of a major out-of-city drive in the afternoon or evening.
 - For family trips, avoid exhausting out-and-back travel days.
 - If a destination is too far for a comfortable day trip, replace it with a closer option.
-- SEASONAL INTELLIGENCE:
+- If a seasonal or special experience requires substantial travel, make it a full-day or overnight plan instead of forcing it into a short city day.
+
+Seasonal intelligence:
 - Consider destination climate and travel month when selecting activities.
-- Adapt itinerary to match local season (e.g. winter, summer, rainy season).
+- Adapt the itinerary to match local season.
+- Do NOT suggest activities that are unrealistic for the season.
+- In winter destinations, prioritise seasonal activities such as skiing, snowboarding, snow scenic areas, hot springs, and indoor attractions.
+- In summer destinations, prioritise outdoor activities, beaches, nature, and longer daylight usage.
+- In tropical destinations such as Bali, consider rainy vs dry season and avoid overly outdoor-heavy plans during wet periods.
+- If seasonal activities are strongly relevant for the destination and month, include at least one such activity or day.
 
-- HARD CONSTRAINT: In winter destinations, prioritize seasonal activities such as skiing, snowboarding, snow scenic areas, hot springs, and indoor attractions.
-- HARD CONSTRAINT: In summer destinations, prioritize outdoor activities, beaches, nature, and extended daylight usage.
-- HARD CONSTRAINT: In tropical destinations (e.g. Bali), consider rainy vs dry season and avoid outdoor-heavy plans during heavy rain periods.
-- HARD CONSTRAINT: Do NOT suggest activities that are unrealistic for the season (e.g. beach day in winter, skiing in summer).
-- If destination is in Australia and travel month is June–August:
-  MUST include at least one alpine/snow experience 
-  (e.g., Mt Buller, Mt Baw Baw, Lake Mountain, Falls Creek, Mt Hotham).
+Melbourne / Victoria winter rule:
+- If destination is Melbourne or Victoria and travel month is June, July, or August, you MUST include exactly one snow or alpine day.
+- This snow/alpine day MUST replace a normal city day, not just be treated as an optional extra.
+- The snow/alpine day MUST be a full-day or overnight experience.
+- It MUST start early, around 07:00–08:00.
+- Suitable examples include Mt Buller, Mt Baw Baw, Lake Mountain, Falls Creek, or Mt Hotham.
+- For trips longer than 5 days, prefer at least one full-day or overnight alpine experience unless the trip is clearly city-only.
+- The snow/alpine day should be placed in the first half of the trip (Day 2–4) unless strong reason otherwise.
 
-- For trips longer than 5 days:
-  include 1 overnight stay OR 1 full-day trip to a snow destination.
+Interest handling:
+- If interests include Sightseeing, include recognisable must-see highlights.
+- If interests include Hidden gems, include at least 1 lesser-known but worthwhile stop on suitable days.
+- If interests include Local experiences, include neighbourhoods or authentic local areas, not only tourist icons.
+- If interests include Family-friendly, favour easier logistics, practical pacing, and fun kid-suitable stops.
+- If interests include Nightlife, include at least one evening-focused stop where suitable.
+- If interests include Relaxation, reduce over-packing and include calmer scenic breaks.
+- If interests include Instagram spots, favour visually attractive places and views.
 
-- Prioritise the closest ski resort from the base city.
-- If seasonal experience requires long travel (>2.5 hours),
-  group into a full-day or overnight trip instead of splitting across days.
+Family handling:
+- If kids age group is baby, toddler, or kids: use stroller-friendly or easier logistics, shorter travel hops, include breaks, early dinners, and avoid late-night activities.
+- Include at least 1 kid-appropriate stop per day when kids age group is not none.
+
+Output quality:
+- Keep notes short and practical.
+- Use specific place names where relevant.
 
 SEO requirements:
 - Also create SEO-friendly fields for the whole trip.
@@ -1364,7 +1360,7 @@ SEO requirements:
   - "3 Day Singapore Itinerary for Families (2026)"
   - "7 Day Tokyo Itinerary for First-Time Visitors (2026)"
   - "5 Day Bali Itinerary for Couples (2026)"
-- Use specific place names where relevant.
+  - Use specific place names where relevant.
 `.trim();
 }
 
