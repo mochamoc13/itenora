@@ -358,9 +358,32 @@ const title =
     ? rawTitle
     : cleanText(trip.title) || buildFallbackTitle(destination, input, itinerary);
 
-const introParagraph = days
-  ? `Discover the magic of ${destination || "your destination"} with this ${days}-day family itinerary. Perfect for parents and kids alike, this plan features a blend of iconic sights and enjoyable activities that cater to all ages.`
-  : `Discover the magic of ${destination || "your destination"} with this itinerary.`;
+const audienceLabel =
+  cleanText(input?.people) === "family"
+    ? "family"
+    : cleanText(input?.people) === "couple"
+      ? "couple"
+      : cleanText(input?.people) === "solo"
+        ? "solo"
+        : "travel";
+
+const normalizedDestination = destination.toLowerCase();
+
+const isBaliPage = normalizedDestination.includes("bali");
+
+const isJapanPage =
+  normalizedDestination.includes("japan") ||
+  normalizedDestination.includes("tokyo") ||
+  normalizedDestination.includes("osaka") ||
+  normalizedDestination.includes("kyoto");
+
+const introParagraph = isBaliPage
+  ? "Planning a 5-day Bali itinerary for solo travel on a budget? This guide covers the best places to visit in Bali including Uluwatu, Ubud, rice terraces, temples, and hidden gems — all organised into a simple, stress-free 5-day plan."
+  : isJapanPage
+    ? "Planning a Japan itinerary? This guide helps you explore the best attractions, food spots, and practical day-by-day travel ideas without spending hours planning everything yourself."
+    : days
+      ? `Planning a ${days}-day ${destination || "trip"} itinerary? This guide features a practical mix of attractions, memorable stops, and day-by-day travel ideas to make your trip easier.`
+      : `Planning a trip to ${destination || "your destination"}? This itinerary gives you practical day-by-day ideas to make travel planning easier.`;
  const seoOverviewBullets = cleanStringArray(seo.overviewBullets);
 
 const generatedOverviewBullets = itinerary.map((day: any, index: number) => {
@@ -477,11 +500,13 @@ const overviewBullets =
             {introParagraph}
           </p>
 
-          <p className="mt-2 text-sm leading-6 text-gray-600">
-            Updated for 2026 travel. Use this itinerary as a flexible travel
-            guide for what to do, where to go, and how to organise each day
-            more smoothly.
-          </p>
+      <p className="mt-2 text-sm leading-6 text-gray-600">
+  {isBaliPage
+    ? "Perfect for solo travellers, this itinerary helps you save money, avoid tourist traps, and make the most of your time in Bali without overplanning."
+    : isJapanPage
+      ? "Perfect for first-time visitors, couples, families, or solo travellers who want a smoother and more practical Japan trip."
+      : "Updated for 2026 travel. Use this itinerary as a flexible travel guide for what to do, where to go, and how to organise each day more smoothly."}
+</p>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
             {days ? (
