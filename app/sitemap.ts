@@ -1,18 +1,21 @@
 import type { MetadataRoute } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl =
-    (process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com").replace(/\/$/, "");
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com").replace(/\/$/, "");
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   const { data: trips, error } = await supabase
     .from("itineraries")
     .select("slug, created_at")
     .not("slug", "is", null)
+    .neq("slug", "")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -34,12 +37,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: latestTripDate,
       changeFrequency: "daily",
       priority: 1,
-    },
-    {
-      url: `${baseUrl}/trips`,
-      lastModified: latestTripDate,
-      changeFrequency: "daily",
-      priority: 0.8,
     },
   ];
 
