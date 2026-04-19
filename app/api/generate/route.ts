@@ -437,12 +437,17 @@ function buildDestinationSpecificGuidance(safe: SafeRequest) {
     ].join("\n");
   }
 
-  if (target.includes("tokyo") || target.includes("japan")) {
-    return [
-      "For Tokyo/Japan trips, spread days across clearly different districts such as Asakusa/Ueno, Shibuya/Harajuku, Shinjuku, Ginza/Tsukiji, Odaiba, Akihabara/Ikebukuro, and one sensible day trip if needed.",
-      "Do not repeat the same type of shrine-shopping-food day across multiple days.",
-    ].join("\n");
-  }
+if (target.includes("tokyo") || target.includes("japan") || target.includes("osaka") || target.includes("kyoto")) {
+  return [
+    "For Japan trips, organise days by logical districts and minimise cross-city or cross-district backtracking.",
+    "Cluster nearby attractions on the same day and keep adjacent districts together on consecutive days where sensible.",
+    "For Osaka specifically, group areas like Osaka Castle / central Osaka, Dotonbori-Namba-Shinsaibashi, Umeda, Bay Area / Aquarium, and Universal Studios Japan logically.",
+    "Universal Studios Japan should normally be treated as a full-day attraction, especially for families.",
+    "Do not schedule another major attraction after Universal Studios Japan on the same day unless it is only a short evening food or rest stop nearby.",
+    "Large aquariums, major zoos, and large museums should be treated as half-day anchors, not quick 1-hour stops.",
+    "Do not repeat the same type of shrine-shopping-food day across multiple days.",
+  ].join("\n");
+}
 
   if (target.includes("singapore")) {
     return [
@@ -451,12 +456,17 @@ function buildDestinationSpecificGuidance(safe: SafeRequest) {
     ].join("\n");
   }
 
-  if (target.includes("bali")) {
-    return [
-      "For Bali, vary days across beach, cliff/coast, rice terrace or nature, temple/culture, cafe or lifestyle zones, family-friendly attractions, and one slower scenic day.",
-      "Do not repeat beach club style days.",
-    ].join("\n");
-  }
+if (target.includes("bali")) {
+  return [
+    "For Bali, organise the itinerary by logical stay zones instead of bouncing across the island.",
+    "Cluster nearby days together. If Ubud is used as a base, keep Ubud-area attractions on consecutive days where possible instead of returning there after several days elsewhere.",
+    "Typical Bali flow should group areas such as: Uluwatu / South Bali, Seminyak-Canggu, Ubud / central Bali, East Bali, or Nusa Penida as their own sensible zones.",
+    "Do not create unnecessary back-and-forth between south Bali and Ubud on separate non-consecutive days unless there is a strong reason.",
+    "If 2 days naturally belong in Ubud, place them back-to-back and recommend Ubud accommodation for both days.",
+    "Vary days across beach, cliff/coast, rice terrace or nature, temple/culture, cafe or lifestyle zones, family-friendly attractions, and one slower scenic day.",
+    "Do not repeat beach club style days.",
+  ].join("\n");
+}
 
   if (target.includes("sydney")) {
     return [
@@ -505,6 +515,10 @@ function buildDayTripRules(safe: SafeRequest) {
     "Do NOT schedule long-distance departures late in the day.",
     "If a place is too far for a comfortable same-day trip, keep it out of the itinerary.",
     "For family trips, be stricter about travel time and avoid exhausting same-day return journeys.",
+    "Group nearby districts and nearby attractions into the same day whenever possible.",
+    "If multiple days use the same base area, place them on consecutive days where possible instead of returning to that area later in the trip.",
+    "Avoid zig-zagging between opposite sides of the destination on different days unless there is a very strong reason.",
+    "A major attraction day should not also include another major anchor far away on the same day.",
   ].join("\n");
 }
 
@@ -1095,6 +1109,16 @@ Strict rules:
 - Only make the final day lighter if departTime is provided.
 - Middle days should feel like full days, not dinner-only or night-only plans.
 - Make it map-friendly: cluster places each day to reduce backtracking.
+- Make the trip flow logically across days, not just within each day.
+- If two days naturally belong to the same base area, keep them adjacent instead of revisiting that area later.
+- Prefer a zone-by-zone flow across the trip.
+- Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
+- Major theme parks such as Universal Studios or Disneyland should usually take a full day, especially for families.
+- Do not schedule another major attraction after a full-day theme park.
+- Large aquariums, major zoos, major museums, and extensive heritage complexes should usually be treated as half-day anchors.
+- Avoid unrealistic short durations for major attractions.
+- If a stop would normally take half a day or more, build the rest of the day around it sensibly.
+- When recommending a stay area, keep the next major stops aligned with that area instead of suggesting unnecessary return travel later in the trip.
 - Prefer named, attractive, high-interest stops over vague categories.
 - If interests include Sightseeing, include famous must-see landmarks and recognisable city highlights.
 - If interests include Hidden gems, include at least 1 less-obvious but worthwhile stop on suitable days.
@@ -1429,28 +1453,14 @@ export async function POST(req: Request) {
 
     const seoSource = resolvedChunks[0]?.parsed;
 
-    const seoTitle =
-      typeof seoSource?.seoTitle === "string" && seoSource.seoTitle.trim()
-        ? seoSource.seoTitle.trim()
-        : buildSeoTitle(safe);
+const seoTitle = buildSeoTitle(safe);
+const seoDescription = buildSeoDescription(safe);
+const h1 = buildSeoH1(safe);
+const introParagraph = buildFallbackIntroParagraph(safe);
 
-    const seoDescription =
-      typeof seoSource?.seoDescription === "string" &&
-      seoSource.seoDescription.trim()
-        ? seoSource.seoDescription.trim()
-        : buildSeoDescription(safe);
-
-    const h1 = buildSeoH1(safe);
-
-    const introParagraph =
-      typeof seoSource?.introParagraph === "string" &&
-      seoSource.introParagraph.trim()
-        ? seoSource.introParagraph.trim()
-        : buildFallbackIntroParagraph(safe);
-
-    const overviewBulletsFromAi = sanitizeOverviewBullets(
-      seoSource?.overviewBullets
-    );
+const overviewBulletsFromAi = sanitizeOverviewBullets(
+  seoSource?.overviewBullets
+);
 
     const overviewBullets =
       overviewBulletsFromAi.length > 0
