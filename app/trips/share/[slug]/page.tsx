@@ -379,8 +379,8 @@ const isJapanPage =
 
 const introParagraph = isBaliPage
   ? "Planning a 5-day Bali itinerary for solo travel on a budget? This guide covers the best places to visit in Bali including Uluwatu, Ubud, rice terraces, temples, and hidden gems — all organised into a simple, stress-free 5-day plan."
-  : isJapanPage
-    ? "Planning a Japan itinerary? This guide helps you explore the best attractions, food spots, and practical day-by-day travel ideas without spending hours planning everything yourself."
+ : isJapanPage
+  ? `Planning a ${days || 5}-day ${destination} itinerary for families? This Japan travel guide covers top attractions like Osaka Castle, Dotonbori, Universal Studios Japan, temples, markets, and family-friendly day-by-day stops to make planning much easier.`
     : days
       ? `Planning a ${days}-day ${destination || "trip"} itinerary? This guide features a practical mix of attractions, memorable stops, and day-by-day travel ideas to make your trip easier.`
       : `Planning a trip to ${destination || "your destination"}? This itinerary gives you practical day-by-day ideas to make travel planning easier.`;
@@ -504,7 +504,7 @@ const overviewBullets =
   {isBaliPage
     ? "Perfect for solo travellers, this itinerary helps you save money, avoid tourist traps, and make the most of your time in Bali without overplanning."
     : isJapanPage
-      ? "Perfect for first-time visitors, couples, families, or solo travellers who want a smoother and more practical Japan trip."
+      ? "Perfect for families visiting Japan for the first time, this itinerary helps you balance sightseeing, food, and kid-friendly attractions without overplanning every detail."
       : "Updated for 2026 travel. Use this itinerary as a flexible travel guide for what to do, where to go, and how to organise each day more smoothly."}
 </p>
 
