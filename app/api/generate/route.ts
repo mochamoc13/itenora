@@ -348,7 +348,7 @@ function enforceDayTimeRules(
 }
 
 function enforceOneWayAreaFlow(stops: ItineraryStop[]) {
-  if (stops.length <= 2) return stops;
+  if (stops.length <= 3) return stops;
 
   let currentArea = stops[0].area;
   let switched = false;
@@ -363,8 +363,7 @@ function enforceOneWayAreaFlow(stops: ItineraryStop[]) {
 
     if (stop.area !== currentArea) {
       if (switched) {
-        // ❌ second switch → skip (prevents going back)
-        continue;
+        continue; // prevent bouncing back again
       }
 
       switched = true;
@@ -372,6 +371,11 @@ function enforceOneWayAreaFlow(stops: ItineraryStop[]) {
     }
 
     result.push(stop);
+  }
+
+  // If the filter trims too much, keep the original day
+  if (result.length < Math.max(3, stops.length - 2)) {
+    return stops;
   }
 
   return result;
