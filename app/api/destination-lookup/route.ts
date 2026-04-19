@@ -169,7 +169,11 @@ export async function GET(req: Request) {
   const list = Array.isArray(raw) ? raw : [];
 
   const mapped = list
-    .filter((item) => isAllowedPlace(item.addresstype, item.type))
+    .filter((item) => {
+      if (!isAllowedPlace(item.addresstype, item.type)) return false;
+      const t = classifyType(item.addresstype, item.type);
+      return t === "city" || t === "country";
+    })
     .map((item) => {
       const address = item.address || {};
       const city =
@@ -183,8 +187,28 @@ export async function GET(req: Request) {
       const state = address.state || address.region || undefined;
       const type = classifyType(item.addresstype, item.type);
 
+      const cleanCity = city?.trim();
+      const cleanCountry = country?.trim();
+
+      let label = item.display_name;
+
+      if (cleanCity && cleanCountry) {
+        label = `${cleanCity}, ${cleanCountry}`;
+      } else if (cleanCountry) {
+        label = cleanCountry;
+      } else if (cleanCity) {
+        label = cleanCity;
+      }
+
+      const boostCountries = ["united kingdom", "japan", "australia", "indonesia"];
+      let boost = 0;
+
+      if (boostCountries.includes(normalizeText(cleanCountry || ""))) {
+        boost += 20;
+      }
+
       const result: LookupResult = {
-        label: item.display_name,
+        label,
         city,
         state,
         country,
@@ -195,7 +219,7 @@ export async function GET(req: Request) {
 
       return {
         result,
-        score: scoreResult(item, q),
+        score: scoreResult(item, q) + boost,
       };
     })
     .filter((x) => x.score > 0)
