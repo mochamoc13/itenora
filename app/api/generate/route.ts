@@ -455,6 +455,29 @@ function ensureMinimumStops(
   return topUp;
 }
 
+
+function rebalanceStopTimes(
+  stops: ItineraryStop[],
+  opts: { minStart?: string | null; maxEnd?: string | null }
+): ItineraryStop[] {
+  const adjusted = enforceDayTimeRules(
+    stops.map((s) => ({
+      time: s.time,
+      title: s.title,
+      area: s.area,
+      notes: s.notes,
+      mapQuery: s.mapQuery,
+      costEstimate: s.costEstimate,
+    })),
+    opts
+  );
+
+  return adjusted.map((s, i) => ({
+    ...stops[i],
+    time: typeof s.time === "string" ? s.time : stops[i].time,
+  }));
+}
+
 function buildInterestLabel(safe: SafeRequest) {
   return safe.interests.length > 0
     ? safe.interests.join(", ")
@@ -1514,17 +1537,22 @@ const dedupedWithinDay = dedupeStopsWithinDay(
       const minStopsForDay =
         isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
 
-  const cleanedStops = ensureMinimumStops(
+const cleanedStops = ensureMinimumStops(
   dedupedAcrossTrip,
   flowedStops,
   minStopsForDay,
   seenTripStops
 );
 
-      const dailyCostEstimate = cleanedStops.reduce(
-        (sum, stop) => sum + stop.costEstimate,
-        0
-      );
+const finalStops = rebalanceStopTimes(cleanedStops, {
+  minStart: isDay1 ? safe.arrivalTime ?? null : null,
+  maxEnd: isLastDay ? safe.departTime ?? null : null,
+});
+
+const dailyCostEstimate = finalStops.reduce(
+  (sum, stop) => sum + stop.costEstimate,
+  0
+);
 
       const blueprintDay = blueprint[idx];
 
@@ -1535,7 +1563,7 @@ const dedupedWithinDay = dedupeStopsWithinDay(
           typeof d.theme === "string" && d.theme.trim()
             ? d.theme.trim()
             : blueprintDay?.theme || `Day ${idx + 1}`,
-        stops: cleanedStops,
+       stops: finalStops,
         dailyCostEstimate,
       });
     }
