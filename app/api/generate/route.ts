@@ -798,6 +798,8 @@ function buildTripBlueprint(safe: SafeRequest): BlueprintDay[] {
     guidance: startRole.guidance,
   });
 
+
+
   const reusableRoles = rolePool.filter((r) => r.role !== startRole.role);
   let poolIndex = 0;
 
@@ -829,6 +831,26 @@ function buildTripBlueprint(safe: SafeRequest): BlueprintDay[] {
 
     poolIndex += 1;
   }
+
+  // 🔥 FORCE SNOW DAY FOR MELBOURNE WINTER
+const month = safe.startDate
+  ? new Date(`${safe.startDate}T00:00:00`).getMonth() + 1
+  : null;
+
+const isMelbourne =
+  normalizeKey(safe.destination).includes("melbourne") ||
+  normalizeKey(safe.city).includes("melbourne") ||
+  normalizeKey(safe.country).includes("australia");
+
+if (isMelbourne && month && month >= 6 && month <= 8 && safe.days >= 5) {
+  blueprint[2] = {
+    day: 3,
+    role: "snow-day",
+    theme: "Snow day at Mt Buller",
+    guidance:
+      "Full-day or overnight trip to Mt Buller or nearby alpine resort. Include snow play, skiing or scenic alpine experience. Start early and dedicate the entire day to this.",
+  };
+}
 
   return blueprint.slice(0, safe.days);
 }
@@ -1256,7 +1278,11 @@ Strict rules:
 - Make the trip flow logically across days, not just within each day.
 - If two days naturally belong to the same base area, keep them adjacent instead of revisiting that area later.
 - If seasonal activities are strongly relevant for the destination and month, include at least one such activity or day.
-- For Melbourne or Victoria trips in June-August, prefer at least one snow or alpine experience on trips longer than 5 days unless the trip is clearly city-only.
+HARD CONSTRAINT:
+If destination is Melbourne or Victoria and month is June–August:
+- MUST include at least one snow/alpine day (Mt Buller, Mt Hotham, Lake Mountain, Falls Creek)
+- MUST allocate a FULL day (minimum 6–8 hours)
+- MUST start early morning (~07:00–08:00)
 - If a seasonal highlight requires substantial travel, make it a full-day or overnight plan instead of forcing it into a short city day.
 - Prefer a zone-by-zone flow across the trip.
 - Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
@@ -1267,6 +1293,9 @@ Strict rules:
   - Only allow 1–2 nearby minor activities after it (e.g. dinner, short walk).
 
 - HARD CONSTRAINT: Do NOT include more than ONE major anchor attraction per day.
+HARD CONSTRAINT:
+Do NOT create more than 2 "food + cafe + market" style days in the entire trip.
+Each day must introduce a distinctly different experience type.
 
 - HARD CONSTRAINT: Do NOT schedule more than 2 different areas in one day.
   - Prefer all stops to be in the same district or adjacent districts.
