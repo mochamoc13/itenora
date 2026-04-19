@@ -294,8 +294,19 @@ function enforceDayTimeRules(
   stops: StopWithTime[],
   opts: { minStart?: string | null; maxEnd?: string | null }
 ): StopWithTime[] {
+
   const minStartM = toMinutes(opts.minStart ?? undefined);
   const maxEndM = toMinutes(opts.maxEnd ?? undefined);
+
+  // ✅ ADD THIS BLOCK RIGHT HERE
+  const hasFullDayAnchor = stops.some(s =>
+    typeof s.title === "string" &&
+/(universal|disney|theme park|studio|resort)/i.test(s.title)
+  );
+
+  if (hasFullDayAnchor) {
+    return stops; // 🚀 DO NOT touch timing
+  }
 
   const parsed: StopWithInternalTime[] = stops.map((s) => ({
     ...s,
@@ -1105,6 +1116,10 @@ Strict rules:
 - Do NOT make multiple days feel like the same pattern with only minor changes.
 - Each day must feel clearly different from the others in both area and day style.
 - For full sightseeing days, include a mix of morning, afternoon, and evening stops.
+- Group itinerary into 1–2 accommodation bases for the entire trip.
+- Stay in each base for at least 2 consecutive days.
+- Do NOT switch base every day unless absolutely necessary.
+- Each day must be planned around the current base location.
 - Only make Day 1 lighter if arrivalTime is provided.
 - Only make the final day lighter if departTime is provided.
 - Middle days should feel like full days, not dinner-only or night-only plans.
@@ -1114,6 +1129,20 @@ Strict rules:
 - Prefer a zone-by-zone flow across the trip.
 - Do not bounce between opposite areas on Day 2 and Day 5 if those places could be grouped together earlier.
 - Major theme parks such as Universal Studios or Disneyland should usually take a full day, especially for families.
+- HARD CONSTRAINT: If a major anchor attraction (theme park, large zoo, major aquarium, full-day tour) is included:
+  - It MUST take at least 6 hours of the schedule.
+  - Do NOT schedule another major attraction on the same day.
+  - Only allow 1–2 nearby minor activities after it (e.g. dinner, short walk).
+
+- HARD CONSTRAINT: Do NOT include more than ONE major anchor attraction per day.
+
+- HARD CONSTRAINT: Do NOT schedule more than 2 different areas in one day.
+  - Prefer all stops to be in the same district or adjacent districts.
+
+- HARD CONSTRAINT: Total realistic day duration must be between 8–10 hours.
+  - Do not compress multiple large attractions into a short time window.
+
+- HARD CONSTRAINT: If an attraction is described as "full day", it must NOT end before late afternoon (~16:00–18:00).
 - Do not schedule another major attraction after a full-day theme park.
 - Only allow a light nearby evening stop after a full-day theme park, such as dinner or a short walk.
 - If an activity is inside a major attraction (e.g. Universal Studios, Disneyland),
