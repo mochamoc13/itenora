@@ -506,6 +506,8 @@ if (target.includes("bali")) {
     "If 2 days naturally belong in Ubud, place them back-to-back and recommend Ubud accommodation for both days.",
     "Vary days across beach, cliff/coast, rice terrace or nature, temple/culture, cafe or lifestyle zones, family-friendly attractions, and one slower scenic day.",
     "Do not repeat beach club style days.",
+    "If the trip starts in south Bali, do not move inland and then return to south Bali later unless the final day is clearly built as a one-way transfer.",
+"Recommended hotel areas should stay consistent for consecutive days in the same zone.",
   ].join("\n");
 }
 
@@ -1082,6 +1084,10 @@ function buildChunkPrompt(params: {
   const blueprintText = formatBlueprintForPrompt(blueprintDays);
   const destinationGuidance = buildDestinationSpecificGuidance(safe);
   const dayTripRules = buildDayTripRules(safe);
+  const travelMonth =
+  safe.startDate
+    ? new Date(safe.startDate).toLocaleString("en-US", { month: "long" })
+    : "unknown";
 
   return `
 Create a ${chunkDays}-day itinerary for part ${chunkIndex + 1} of ${chunkCount}.
@@ -1092,6 +1098,7 @@ Budget: ${safe.budget}
 Pace: ${safe.pace}
 Interests: ${interestsText}
 Dates: ${chunkDates.length ? chunkDates.join(", ") : "flexible"}
+Travel month: ${travelMonth}
 Stops per day: ${stopsPerDay}
 
 Arrival time: ${isFirstChunk ? safe.arrivalTime ?? "not provided" : "not relevant"}
@@ -1150,6 +1157,11 @@ Strict rules:
 - Stay in each base for at least 2 consecutive days.
 - Do NOT switch base every day unless absolutely necessary.
 - Each day must be planned around the current base location.
+- HARD CONSTRAINT: Prefer one accommodation base for the first half of the trip and one accommodation base for the second half of the trip.
+- HARD CONSTRAINT: Do not recommend returning to a previous accommodation base later in the itinerary after moving to a new base.
+- HARD CONSTRAINT: If Days 1 and 2 are in the same zone, keep the recommended hotel area the same unless there is a strong reason to move.
+- HARD CONSTRAINT: For Bali, prefer a clean progression such as Uluwatu/South Bali -> Seminyak-Canggu -> Ubud, or Ubud -> Seminyak-Canggu, instead of bouncing back and forth.
+- HARD CONSTRAINT: When changing to a new base area, the rest of that day and the following day should mainly stay around that new base.
 - Only make Day 1 lighter if arrivalTime is provided.
 - Only make the final day lighter if departTime is provided.
 - Middle days should feel like full days, not dinner-only or night-only plans.
@@ -1198,6 +1210,15 @@ Strict rules:
 - Never place the start of a major out-of-city drive in the afternoon or evening.
 - For family trips, avoid exhausting out-and-back travel days.
 - If a destination is too far for a comfortable day trip, replace it with a closer option.
+- SEASONAL INTELLIGENCE:
+- Consider destination climate and travel month when selecting activities.
+- Adapt itinerary to match local season (e.g. winter, summer, rainy season).
+
+- HARD CONSTRAINT: In winter destinations, prioritize seasonal activities such as skiing, snowboarding, snow scenic areas, hot springs, and indoor attractions.
+- HARD CONSTRAINT: In summer destinations, prioritize outdoor activities, beaches, nature, and extended daylight usage.
+- HARD CONSTRAINT: In tropical destinations (e.g. Bali), consider rainy vs dry season and avoid outdoor-heavy plans during heavy rain periods.
+- HARD CONSTRAINT: Do NOT suggest activities that are unrealistic for the season (e.g. beach day in winter, skiing in summer).
+
 
 SEO requirements:
 - Also create SEO-friendly fields for the whole trip.
@@ -1489,12 +1510,12 @@ const dedupedWithinDay = dedupeStopsWithinDay(
       const minStopsForDay =
         isDay1 || isLastDay ? Math.max(2, stopsPerDay - 1) : stopsPerDay;
 
-      const cleanedStops = ensureMinimumStops(
-        dedupedAcrossTrip,
-        normalizedStops,
-        minStopsForDay,
-        seenTripStops
-      );
+  const cleanedStops = ensureMinimumStops(
+  dedupedAcrossTrip,
+  flowedStops,
+  minStopsForDay,
+  seenTripStops
+);
 
       const dailyCostEstimate = cleanedStops.reduce(
         (sum, stop) => sum + stop.costEstimate,
