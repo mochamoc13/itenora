@@ -10,16 +10,121 @@ type LookupResult = {
   lng?: number;
 };
 
-const BLOCKED_BROAD = new Set([
-  "europe",
-  "asia",
-  "africa",
-  "america",
-  "north america",
-  "south america",
-  "antarctica",
-  "oceania",
-]);
+const DESTINATION_ALIASES: Array<{
+  keywords: string[];
+  result: LookupResult;
+}> = [
+  {
+    keywords: ["europe", "euro", "european"],
+    result: {
+      label: "Europe",
+      city: "Europe",
+      country: "",
+      type: "region",
+      lat: 54.526,
+      lng: 15.2551,
+    },
+  },
+  {
+    keywords: ["asia", "asian"],
+    result: {
+      label: "Asia",
+      city: "Asia",
+      country: "",
+      type: "region",
+      lat: 34.0479,
+      lng: 100.6197,
+    },
+  },
+  {
+    keywords: ["oceania"],
+    result: {
+      label: "Oceania",
+      city: "Oceania",
+      country: "",
+      type: "region",
+      lat: -22.7359,
+      lng: 140.0188,
+    },
+  },
+  {
+    keywords: ["bali"],
+    result: {
+      label: "Bali, Indonesia",
+      city: "Bali",
+      country: "Indonesia",
+      type: "city",
+      lat: -8.4095,
+      lng: 115.1889,
+    },
+  },
+  {
+    keywords: ["indonesia", "indo"],
+    result: {
+      label: "Indonesia",
+      city: "Indonesia",
+      country: "Indonesia",
+      type: "country",
+      lat: -0.7893,
+      lng: 113.9213,
+    },
+  },
+  {
+    keywords: ["japan"],
+    result: {
+      label: "Japan",
+      city: "Japan",
+      country: "Japan",
+      type: "country",
+      lat: 36.2048,
+      lng: 138.2529,
+    },
+  },
+  {
+    keywords: ["australia", "aus"],
+    result: {
+      label: "Australia",
+      city: "Australia",
+      country: "Australia",
+      type: "country",
+      lat: -25.2744,
+      lng: 133.7751,
+    },
+  },
+  {
+    keywords: ["uk", "united kingdom", "england", "britain", "great britain"],
+    result: {
+      label: "United Kingdom",
+      city: "United Kingdom",
+      country: "United Kingdom",
+      type: "country",
+      lat: 55.3781,
+      lng: -3.436,
+    },
+  },
+  {
+    keywords: ["usa", "us", "united states", "america"],
+    result: {
+      label: "United States",
+      city: "United States",
+      country: "United States",
+      type: "country",
+      lat: 37.0902,
+      lng: -95.7129,
+    },
+  },
+  {
+    keywords: ["singapore"],
+    result: {
+      label: "Singapore",
+      city: "Singapore",
+      country: "Singapore",
+      type: "country",
+      lat: 1.3521,
+      lng: 103.8198,
+    },
+  },
+];
 
 function normalizeText(value: string) {
   return value
@@ -103,15 +208,16 @@ function scoreResult(item: any, query: string) {
 
   for (const h of haystacks) {
     if (!h) continue;
-    if (h === q) score += 120;
-    else if (h.startsWith(q)) score += 80;
+
+    if (h === q) score += 180;
+    else if (h.startsWith(q)) score += 120;
     else if (h.includes(q)) score += 40;
   }
 
   const kind = classifyType(item.addresstype, item.type);
-  if (kind === "city") score += 40;
-  if (kind === "country") score += 30;
-  if (kind === "region") score += 10;
+  if (kind === "city") score += 45;
+  if (kind === "country") score += 35;
+  if (kind === "region") score += 20;
 
   if (!isAllowedPlace(item.addresstype, item.type)) score -= 200;
 
@@ -120,14 +226,27 @@ function scoreResult(item: any, query: string) {
 
 function dedupeResults(results: LookupResult[]) {
   const seen = new Set<string>();
+
   return results.filter((r) => {
     const key = normalizeText(
       `${r.label}|${r.city || ""}|${r.country || ""}|${r.type}`
     );
+
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+function getAliasMatches(query: string): LookupResult[] {
+  const q = normalizeText(query);
+
+  return DESTINATION_ALIASES.filter((item) =>
+    item.keywords.some((keyword) => {
+      const k = normalizeText(keyword);
+      return k.startsWith(q) || q.startsWith(k);
+    })
+  ).map((item) => item.result);
 }
 
 export async function GET(req: Request) {
@@ -138,14 +257,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ results: [] });
   }
 
-  const normalizedQ = normalizeText(q);
-
-  if (BLOCKED_BROAD.has(normalizedQ)) {
-    return NextResponse.json({
-      results: [],
-      message: "Please choose a specific city or country.",
-    });
-  }
+  const aliasMatches = getAliasMatches(q);
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("q", q);
@@ -153,87 +265,125 @@ export async function GET(req: Request) {
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "12");
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "itenora/1.0",
-      "Accept-Language": "en",
-    },
-    cache: "no-store",
-  });
+  try {
+    const res = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": "itenora/1.0",
+        "Accept-Language": "en",
+      },
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    return NextResponse.json({ results: [] });
-  }
+    if (!res.ok) {
+      return NextResponse.json({
+        results: aliasMatches.slice(0, 6),
+        message:
+          aliasMatches.length === 0
+            ? "No matching destinations found."
+            : undefined,
+      });
+    }
 
-  const raw = await res.json();
-  const list = Array.isArray(raw) ? raw : [];
+    const raw = await res.json();
+    const list = Array.isArray(raw) ? raw : [];
 
-  const mapped = list
-    .filter((item) => {
-      if (!isAllowedPlace(item.addresstype, item.type)) return false;
-      const t = classifyType(item.addresstype, item.type);
-      return t === "city" || t === "country";
-    })
-    .map((item) => {
-      const address = item.address || {};
-      const city =
-        address.city ||
-        address.town ||
-        address.village ||
-        address.municipality ||
-        undefined;
+    const mapped = list
+      .filter((item) => {
+        if (!isAllowedPlace(item.addresstype, item.type)) return false;
+        const t = classifyType(item.addresstype, item.type);
+        return t === "city" || t === "country" || t === "region";
+      })
+      .map((item) => {
+        const address = item.address || {};
+        const city =
+          address.city ||
+          address.town ||
+          address.village ||
+          address.municipality ||
+          undefined;
 
-      const country = address.country || undefined;
-      const state = address.state || address.region || undefined;
-      const type = classifyType(item.addresstype, item.type);
+        const country = address.country || undefined;
+        const state = address.state || address.region || undefined;
+        const type = classifyType(item.addresstype, item.type);
 
-      const cleanCity = city?.trim();
-      const cleanCountry = country?.trim();
+        const cleanCity = city?.trim();
+        const cleanCountry = country?.trim();
+        const cleanState = state?.trim();
 
-      let label = item.display_name;
+        let label = item.display_name;
 
-      if (cleanCity && cleanCountry) {
-        label = `${cleanCity}, ${cleanCountry}`;
-      } else if (cleanCountry) {
-        label = cleanCountry;
-      } else if (cleanCity) {
-        label = cleanCity;
-      }
+        if (type === "country" && cleanCountry) {
+          label = cleanCountry;
+        } else if (type === "region" && cleanState && cleanCountry) {
+          label = `${cleanState}, ${cleanCountry}`;
+        } else if (cleanCity && cleanCountry) {
+          label = `${cleanCity}, ${cleanCountry}`;
+        } else if (cleanCountry) {
+          label = cleanCountry;
+        } else if (cleanCity) {
+          label = cleanCity;
+        }
 
-      const boostCountries = ["united kingdom", "japan", "australia", "indonesia"];
-      let boost = 0;
+        const boostCountries = [
+          "united kingdom",
+          "japan",
+          "australia",
+          "indonesia",
+          "singapore",
+        ];
 
-      if (boostCountries.includes(normalizeText(cleanCountry || ""))) {
-        boost += 20;
-      }
+        let boost = 0;
 
-      const result: LookupResult = {
-        label,
-        city,
-        state,
-        country,
-        type,
-        lat: item.lat ? Number(item.lat) : undefined,
-        lng: item.lon ? Number(item.lon) : undefined,
-      };
+        if (boostCountries.includes(normalizeText(cleanCountry || ""))) {
+          boost += 20;
+        }
 
-      return {
-        result,
-        score: scoreResult(item, q) + boost,
-      };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.result);
+        if (normalizeText(cleanCity || "") === normalizeText(q)) {
+          boost += 60;
+        }
 
-  const deduped = dedupeResults(mapped).slice(0, 6);
+        if (normalizeText(cleanCountry || "") === normalizeText(q)) {
+          boost += 60;
+        }
 
-  if (deduped.length === 0) {
+        if (normalizeText(cleanState || "") === normalizeText(q)) {
+          boost += 30;
+        }
+
+        const result: LookupResult = {
+          label,
+          city,
+          state,
+          country,
+          type,
+          lat: item.lat ? Number(item.lat) : undefined,
+          lng: item.lon ? Number(item.lon) : undefined,
+        };
+
+        return {
+          result,
+          score: scoreResult(item, q) + boost,
+        };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.result);
+
+    const deduped = dedupeResults([...aliasMatches, ...mapped]).slice(0, 6);
+
+    if (deduped.length === 0) {
+      return NextResponse.json({
+        results: [],
+        message: "No matching destinations found.",
+      });
+    }
+
+    return NextResponse.json({ results: deduped });
+  } catch {
     return NextResponse.json({
-      results: [],
-      message: "Please choose a specific city or country.",
+      results: aliasMatches.slice(0, 6),
+      message:
+        aliasMatches.length === 0 ? "No matching destinations found." : undefined,
     });
   }
-
-  return NextResponse.json({ results: deduped });
 }

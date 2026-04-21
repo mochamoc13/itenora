@@ -10,6 +10,10 @@ type DestinationOption = {
   lng?: number;
 };
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
 function formatInputValue(item: DestinationOption) {
   const city = (item.city || "").trim();
   const country = (item.country || "").trim();
@@ -27,6 +31,50 @@ function formatSecondaryLabel(item: DestinationOption) {
   if (city && country) return `${city}, ${country}`;
   if (country) return country;
   return item.label;
+}
+
+function createTypedOption(value: string): DestinationOption {
+  const trimmed = value.trim();
+
+  return {
+    label: trimmed,
+    city: trimmed,
+  };
+}
+
+function hasExactMatch(
+  results: DestinationOption[],
+  typedValue: string
+): boolean {
+  const normalizedTyped = normalizeText(typedValue);
+
+  return results.some((item) => {
+    const label = normalizeText(item.label || "");
+    const city = normalizeText(item.city || "");
+    const country = normalizeText(item.country || "");
+    const formatted = normalizeText(formatInputValue(item));
+
+    return (
+      label === normalizedTyped ||
+      city === normalizedTyped ||
+      country === normalizedTyped ||
+      formatted === normalizedTyped
+    );
+  });
+}
+
+function mergeResultsWithTypedOption(
+  results: DestinationOption[],
+  typedValue: string
+) {
+  const trimmed = typedValue.trim();
+  if (!trimmed) return results;
+
+  if (hasExactMatch(results, trimmed)) {
+    return results;
+  }
+
+  return [createTypedOption(trimmed), ...results];
 }
 
 export default function DestinationLookup({
@@ -147,23 +195,29 @@ export default function DestinationLookup({
 
         if (currentRequestId !== requestIdRef.current) return;
 
-        const nextResults = Array.isArray(data?.results) ? data.results : [];
+        const apiResults = Array.isArray(data?.results) ? data.results : [];
+        const nextResults = mergeResultsWithTypedOption(apiResults, trimmed);
         const nextMessage =
           typeof data?.message === "string" ? data.message : "";
 
         setResults(nextResults);
-        setMessage(nextMessage);
+
+        if (apiResults.length === 0 && nextMessage) {
+          setMessage(`${nextMessage} Press Enter to use exactly what you typed.`);
+        } else if (apiResults.length === 0) {
+          setMessage("Press Enter to use exactly what you typed.");
+        } else {
+          setMessage("");
+        }
+
         setOpen(true);
         setHighlightedIndex(nextResults.length > 0 ? 0 : -1);
       } catch {
         if (currentRequestId !== requestIdRef.current) return;
 
-        setResults([
-          {
-            label: trimmed,
-            city: trimmed,
-          },
-        ]);
+        const fallbackResults = [createTypedOption(trimmed)];
+
+        setResults(fallbackResults);
         setMessage("Press Enter to use exactly what you typed.");
         setOpen(true);
         setHighlightedIndex(0);
@@ -246,14 +300,7 @@ export default function DestinationLookup({
             return;
           }
 
-          if (showDropdown && results.length > 0) {
-            return;
-          }
-
-          selectItem({
-            label: trimmed,
-            city: trimmed,
-          });
+          selectItem(createTypedOption(trimmed));
         }}
         placeholder="Search city or country (e.g. Tokyo, Bali, London)"
         autoComplete="off"
@@ -275,11 +322,20 @@ export default function DestinationLookup({
 
           {!loading &&
             results.map((item, index) => {
-              const primary =
-                (item.city || "").trim() ||
-                (item.country || "").trim() ||
-                item.label;
-              const secondary = formatSecondaryLabel(item);
+              const isTypedOption =
+                normalizeText(item.label) === normalizeText(query) &&
+                normalizeText(item.city || "") === normalizeText(query) &&
+                !(item.country || "").trim();
+
+              const primary = isTypedOption
+                ? `Use "${query.trim()}"`
+                : (item.city || "").trim() ||
+                  (item.country || "").trim() ||
+                  item.label;
+
+              const secondary = isTypedOption
+                ? "Use exactly what you typed"
+                : formatSecondaryLabel(item);
 
               return (
                 <button
