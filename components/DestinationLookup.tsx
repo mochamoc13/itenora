@@ -18,7 +18,7 @@ function formatInputValue(item: DestinationOption) {
   const city = (item.city || "").trim();
   const country = (item.country || "").trim();
 
-  if (city && country) return `${city}, ${country}`;
+  if (city && country && city !== country) return `${city}, ${country}`;
   if (city) return city;
   if (country) return country;
   return item.label;
@@ -28,7 +28,7 @@ function formatSecondaryLabel(item: DestinationOption) {
   const city = (item.city || "").trim();
   const country = (item.country || "").trim();
 
-  if (city && country) return `${city}, ${country}`;
+  if (city && country && city !== country) return `${city}, ${country}`;
   if (country) return country;
   return item.label;
 }
@@ -69,12 +69,28 @@ function mergeResultsWithTypedOption(
 ) {
   const trimmed = typedValue.trim();
   if (!trimmed) return results;
-
-  if (hasExactMatch(results, trimmed)) {
-    return results;
-  }
+  if (hasExactMatch(results, trimmed)) return results;
 
   return [createTypedOption(trimmed), ...results];
+}
+
+function isTypedOption(item: DestinationOption, query: string) {
+  const normalizedQuery = normalizeText(query);
+
+  return (
+    normalizeText(item.label || "") === normalizedQuery &&
+    normalizeText(item.city || "") === normalizedQuery &&
+    !(item.country || "").trim()
+  );
+}
+
+function getBadge(item: DestinationOption) {
+  const city = (item.city || "").trim();
+  const country = (item.country || "").trim();
+
+  if (!country) return "Region";
+  if (city && country && city !== country) return "City";
+  return "Country";
 }
 
 export default function DestinationLookup({
@@ -100,6 +116,7 @@ export default function DestinationLookup({
   const [message, setMessage] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [highlightedIndex, setHighlightedIndex] = React.useState<number>(-1);
+  const [showTrending, setShowTrending] = React.useState(false);
 
   React.useEffect(() => {
     if (suppressNextQueryEffectRef.current) {
@@ -138,6 +155,7 @@ export default function DestinationLookup({
       setLoading(false);
       setOpen(false);
       setHighlightedIndex(-1);
+      setShowTrending(false);
 
       onChangeText?.(displayValue);
       onSelect(item);
@@ -156,6 +174,7 @@ export default function DestinationLookup({
       setResults([]);
       setMessage("");
       setHighlightedIndex(-1);
+      setShowTrending(false);
       return;
     }
 
@@ -166,10 +185,53 @@ export default function DestinationLookup({
       setResults([]);
       setMessage("");
       setHighlightedIndex(-1);
+      setShowTrending(false);
       return;
     }
 
     const trimmed = query.trim();
+
+    if (trimmed.length === 0) {
+      const currentRequestId = ++requestIdRef.current;
+
+      const timer = window.setTimeout(async () => {
+        try {
+          setLoading(true);
+
+          const res = await fetch(`/api/destination-lookup?trending=1`, {
+            cache: "no-store",
+          });
+
+          const data = await res.json();
+
+          if (currentRequestId !== requestIdRef.current) return;
+
+          const nextResults = Array.isArray(data?.results) ? data.results : [];
+
+          setResults(nextResults);
+          setMessage(nextResults.length > 0 ? "Popular destinations" : "");
+          setShowTrending(nextResults.length > 0);
+          setOpen(nextResults.length > 0);
+          setHighlightedIndex(nextResults.length > 0 ? 0 : -1);
+        } catch {
+          if (currentRequestId !== requestIdRef.current) return;
+
+          setResults([]);
+          setMessage("");
+          setShowTrending(false);
+          setOpen(false);
+          setHighlightedIndex(-1);
+        } finally {
+          if (currentRequestId === requestIdRef.current) {
+            setLoading(false);
+          }
+        }
+      }, 120);
+
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }
 
     if (trimmed.length < 2) {
       setResults([]);
@@ -177,6 +239,7 @@ export default function DestinationLookup({
       setOpen(false);
       setLoading(false);
       setHighlightedIndex(-1);
+      setShowTrending(false);
       return;
     }
 
@@ -201,6 +264,7 @@ export default function DestinationLookup({
           typeof data?.message === "string" ? data.message : "";
 
         setResults(nextResults);
+        setShowTrending(false);
 
         if (apiResults.length === 0 && nextMessage) {
           setMessage(`${nextMessage} Press Enter to use exactly what you typed.`);
@@ -219,6 +283,7 @@ export default function DestinationLookup({
 
         setResults(fallbackResults);
         setMessage("Press Enter to use exactly what you typed.");
+        setShowTrending(false);
         setOpen(true);
         setHighlightedIndex(0);
       } finally {
@@ -247,16 +312,17 @@ export default function DestinationLookup({
           setHighlightedIndex(-1);
           onChangeText?.(value);
 
-          if (value.trim().length >= 2) {
+          if (value.trim().length >= 0) {
             setOpen(true);
           } else {
             setOpen(false);
             setResults([]);
             setMessage("");
+            setShowTrending(false);
           }
         }}
         onFocus={() => {
-          if (!disabled && query.trim().length >= 2) {
+          if (!disabled) {
             setOpen(true);
           }
         }}
@@ -286,6 +352,15 @@ export default function DestinationLookup({
           }
 
           if (e.key !== "Enter") return;
+
+          if (!trimmed && results.length > 0 && showTrending) {
+            e.preventDefault();
+            if (highlightedIndex >= 0 && highlightedIndex < results.length) {
+              selectItem(results[highlightedIndex]);
+            }
+            return;
+          }
+
           if (!trimmed) return;
 
           e.preventDefault();
@@ -302,14 +377,14 @@ export default function DestinationLookup({
 
           selectItem(createTypedOption(trimmed));
         }}
-        placeholder="Search city or country (e.g. Tokyo, Bali, London)"
+        placeholder="Search city, country or region (e.g. Tokyo, Japan, Europe)"
         autoComplete="off"
         disabled={disabled}
-        className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
+        className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-gray-900 disabled:cursor-not-allowed disabled:bg-gray-50"
       />
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl">
           {loading && (
             <div className="px-4 py-3 text-sm text-gray-500">
               Looking up destinations...
@@ -317,25 +392,26 @@ export default function DestinationLookup({
           )}
 
           {!loading && message && (
-            <div className="px-4 py-3 text-sm text-amber-700">{message}</div>
+            <div className="border-b border-gray-100 px-4 py-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+              {message}
+            </div>
           )}
 
           {!loading &&
             results.map((item, index) => {
-              const isTypedOption =
-                normalizeText(item.label) === normalizeText(query) &&
-                normalizeText(item.city || "") === normalizeText(query) &&
-                !(item.country || "").trim();
+              const typed = isTypedOption(item, query);
 
-              const primary = isTypedOption
+              const primary = typed
                 ? `Use "${query.trim()}"`
                 : (item.city || "").trim() ||
                   (item.country || "").trim() ||
                   item.label;
 
-              const secondary = isTypedOption
+              const secondary = typed
                 ? "Use exactly what you typed"
                 : formatSecondaryLabel(item);
+
+              const badge = typed ? "Custom" : getBadge(item);
 
               return (
                 <button
@@ -350,14 +426,22 @@ export default function DestinationLookup({
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                 >
-                  <div className="text-sm font-medium text-gray-900">
-                    {primary}
-                  </div>
-                  {secondary && secondary !== primary ? (
-                    <div className="mt-1 text-xs text-gray-500">
-                      {secondary}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-gray-900">
+                        {primary}
+                      </div>
+                      {secondary && secondary !== primary ? (
+                        <div className="mt-1 truncate text-xs text-gray-500">
+                          {secondary}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-gray-600">
+                      {badge}
+                    </span>
+                  </div>
                 </button>
               );
             })}
