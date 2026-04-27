@@ -244,16 +244,12 @@ export async function generateMetadata({
     .eq("slug", params.slug)
     .maybeSingle();
 
-  if (!trip) {
-    return {
-      title: "Trip not found | Itenora",
-      description: "Shared itinerary page on Itenora.",
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
-  }
+if (!trip) {
+  return {
+    title: "Trip not found | Itenora",
+    description: "Shared itinerary page on Itenora.",
+  };
+}
 
   const input = trip.generated_plan?.input ?? {};
   const itinerary = Array.isArray(trip.generated_plan?.itinerary)
