@@ -11,6 +11,10 @@ import {
 import KlookDeals from "@/components/KlookDeals";
 import SupportItenora from "@/components/SupportItenora";
 import {
+  CURATED_TRIPS,
+  getCuratedTripBySlug,
+} from "@/data/curated-trips";
+import {
   getIndexableTripSlugs,
   isIndexableTrip,
 } from "@/lib/indexable-trips";
@@ -222,13 +226,18 @@ function buildAgodaBackupLink(params: {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const supabase = createSupabaseServerClient();
+  let trip: any = getCuratedTripBySlug(params.slug);
 
-  const { data: trip } = await supabase
-    .from("itineraries")
-    .select("title, destination, slug, generated_plan")
-    .eq("slug", params.slug)
-    .maybeSingle();
+  if (!trip) {
+    const supabase = createSupabaseServerClient();
+    const { data: storedTrip } = await supabase
+      .from("itineraries")
+      .select("title, destination, slug, generated_plan")
+      .eq("slug", params.slug)
+      .maybeSingle();
+
+    trip = storedTrip;
+  }
 
   if (!trip) {
     return {
@@ -290,13 +299,20 @@ export async function generateMetadata({
 }
 
 export default async function PublicTripPage({ params }: PageProps) {
-  const supabase = createSupabaseServerClient();
+  const curatedTrip = getCuratedTripBySlug(params.slug);
+  let trip: any = curatedTrip;
+  let supabase: ReturnType<typeof createSupabaseServerClient> | null = null;
 
-  const { data: trip } = await supabase
-    .from("itineraries")
-    .select("*")
-    .eq("slug", params.slug)
-    .maybeSingle();
+  if (!trip) {
+    supabase = createSupabaseServerClient();
+    const { data: storedTrip } = await supabase
+      .from("itineraries")
+      .select("*")
+      .eq("slug", params.slug)
+      .maybeSingle();
+
+    trip = storedTrip;
+  }
 
   if (!trip) {
     return (
@@ -383,7 +399,15 @@ export default async function PublicTripPage({ params }: PageProps) {
     (slug) => slug !== params.slug
   );
 
-  if (isIndexableTrip(params.slug) && relatedSlugs.length > 0) {
+  if (curatedTrip) {
+    relatedTrips = CURATED_TRIPS.filter(
+      (candidate) => candidate.slug !== params.slug
+    ).slice(0, 2);
+  } else if (
+    supabase &&
+    isIndexableTrip(params.slug) &&
+    relatedSlugs.length > 0
+  ) {
     const { data } = await supabase
       .from("itineraries")
       .select("slug, title, generated_plan")
@@ -769,7 +793,9 @@ export default async function PublicTripPage({ params }: PageProps) {
         {relatedTrips && relatedTrips.length > 0 ? (
           <section className="border-t pt-10">
             <h2 className="mb-4 text-2xl font-semibold text-gray-900">
-              More {destination} itineraries
+              {curatedTrip
+                ? "More popular itineraries"
+                : `More ${destination} itineraries`}
             </h2>
 
             <ul className="space-y-2">

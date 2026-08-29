@@ -1,8 +1,4 @@
-const DEFAULT_INDEXABLE_TRIPS = [
-  "singapore-3-day-family-budget-itinerary",
-  "tokyo-7-day-family-itinerary",
-  "sydney-3-day-family-budget-itinerary",
-];
+import { CURATED_TRIP_SLUGS } from "@/data/curated-trips";
 
 export function getIndexableTripSlugs() {
   const configured = process.env.INDEXABLE_TRIP_SLUGS
@@ -10,7 +6,7 @@ export function getIndexableTripSlugs() {
     .map((slug) => slug.trim())
     .filter(Boolean);
 
-  return configured?.length ? configured : DEFAULT_INDEXABLE_TRIPS;
+  return configured?.length ? configured : CURATED_TRIP_SLUGS;
 }
 
 export function isIndexableTrip(slug: string) {
