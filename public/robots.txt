@@ -3,6 +3,5 @@ Allow: /
 Disallow: /api
 Disallow: /sign-in
 Disallow: /sign-up
-Disallow: /_next
 
 Sitemap: https://itenora.com/sitemap.xml

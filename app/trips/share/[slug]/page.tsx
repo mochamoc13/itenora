@@ -274,7 +274,9 @@ export async function generateMetadata({
     : `${seoTitle} | Itenora`;
 
   return {
-    title: pageTitle,
+    title: {
+      absolute: pageTitle,
+    },
     description: seoDescription,
     alternates: {
       canonical: canonicalUrl,
