@@ -3,7 +3,6 @@ import Link from "next/link";
 import Script from "next/script";
 import type { Metadata } from "next";
 
-import AccountBillingArea from "@/components/AccountBillingArea";
 import {
   ClerkProvider,
   SignedIn,
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
     template: "%s | Itenora",
   },
   description:
-    "Itenora is an AI travel itinerary planner that helps families, couples, and solo travellers create smart personalised trip plans in seconds.",
+    "Create free personalised AI travel itineraries for families, couples, and solo travellers with Itenora.",
   keywords: [
     "Itenora",
     "AI travel planner",
@@ -37,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Itenora | AI Travel Itinerary Planner",
     description:
-      "Plan smarter trips with Itenora. Create personalised itineraries for families, couples, and solo travellers.",
+      "Plan smarter trips for free with personalised itineraries for families, couples, and solo travellers.",
     url: "https://itenora.com",
     siteName: "Itenora",
     locale: "en_AU",
@@ -47,7 +46,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Itenora | AI Travel Itinerary Planner",
     description:
-      "Create personalised travel itineraries in seconds with Itenora.",
+      "Create free personalised travel itineraries in seconds with Itenora.",
   },
   robots: {
     index: true,
@@ -101,13 +100,15 @@ export default function RootLayout({
 
                 <SignedIn>
                   <Link
-                    href="/itinerary"
+                    href="/trips"
                     className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
                   >
                     My Trips
                   </Link>
 
-                  <AccountBillingArea />
+                  <span className="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+                    Free
+                  </span>
 
                   <UserButton
                     afterSignOutUrl="/"

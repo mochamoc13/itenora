@@ -1,27 +1,24 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const FREE_MONTHLY_LIMIT = 10;
+
 export async function checkUsage(userId: string) {
   const supabase = createSupabaseServerClient();
-  const month = new Date().toISOString().slice(0, 7);
+  const periodKey = new Date().toISOString().slice(0, 7);
 
   const { data } = await supabase
     .from("user_usage")
-    .select("plan, itineraries")
+    .select("itineraries")
     .eq("user_id", userId)
-    .eq("month", month)
+    .eq("period_key", periodKey)
     .maybeSingle();
 
-  const plan = data?.plan || "free";
-  const used = data?.itineraries || 0;
-
-  let limit = 4;
-  if (plan === "plus") limit = 20;
-  if (plan === "pro") limit = 100;
+  const used = data?.itineraries ?? 0;
 
   return {
-    plan,
+    plan: "free" as const,
     used,
-    limit,
-    allowed: used < limit,
+    limit: FREE_MONTHLY_LIMIT,
+    allowed: used < FREE_MONTHLY_LIMIT,
   };
 }

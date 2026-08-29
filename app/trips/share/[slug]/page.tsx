@@ -8,6 +8,12 @@ import {
   isBookableActivity,
   isTopAttraction,
 } from "@/lib/affiliate";
+import KlookDeals from "@/components/KlookDeals";
+import SupportItenora from "@/components/SupportItenora";
+import {
+  getIndexableTripSlugs,
+  isIndexableTrip,
+} from "@/lib/indexable-trips";
 
 type PageProps = {
   params: { slug: string };
@@ -115,15 +121,13 @@ function getCountryFromDestination(destination: string) {
   return "";
 }
 
-
-function getTripDays(input: any, itinerary: any[]) {
-  if (typeof input?.days === "number" && input.days > 0) return input.days;
-  if (Array.isArray(itinerary) && itinerary.length > 0) return itinerary.length;
-  return null;
-}
-
 function buildFallbackTitle(destination: string, input: any, itinerary: any[]) {
-const days = getTripDays(input, itinerary);
+  const days =
+    typeof input?.days === "number"
+      ? input.days
+      : itinerary.length > 0
+        ? itinerary.length
+        : null;
 
   const people = cleanText(input?.people);
   const audience =
@@ -142,8 +146,9 @@ const days = getTripDays(input, itinerary);
   return destination ? `${destination} Itinerary` : "Travel Itinerary";
 }
 
-function buildFallbackDescription(destination: string, input: any, itinerary: any[]) {
-  const days = getTripDays(input, itinerary);
+function buildFallbackDescription(destination: string, input: any) {
+  const days =
+    typeof input?.days === "number" && input.days > 0 ? input.days : null;
 
   const people = cleanText(input?.people);
   const audience =
@@ -156,7 +161,7 @@ function buildFallbackDescription(destination: string, input: any, itinerary: an
           : "for travellers";
 
   if (days && destination) {
-    return `Plan the perfect ${days}-day ${destination} itinerary ${audience}. Includes attractions, food spots, and practical day-by-day planning ideas.`;
+    return `Plan the perfect ${days} day ${destination} itinerary ${audience}. Includes attractions, food spots, and practical day-by-day planning ideas.`;
   }
 
   if (destination) {
@@ -164,25 +169,6 @@ function buildFallbackDescription(destination: string, input: any, itinerary: an
   }
 
   return "Shared itinerary page on Itenora.";
-}
-
-function containsWrongDayLabel(text: string, actualDays: number | null) {
-  if (!text || !actualDays) return false;
-
-  const normalized = text.toLowerCase();
-
-  for (let i = 1; i <= 30; i++) {
-    if (i === actualDays) continue;
-
-    if (
-      normalized.includes(`${i}-day`) ||
-      normalized.includes(`${i} day`)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 function getDayHeading(day: any, index: number) {
@@ -244,12 +230,16 @@ export async function generateMetadata({
     .eq("slug", params.slug)
     .maybeSingle();
 
-if (!trip) {
-  return {
-    title: "Trip not found | Itenora",
-    description: "Shared itinerary page on Itenora.",
-  };
-}
+  if (!trip) {
+    return {
+      title: "Trip not found | Itenora",
+      description: "Shared itinerary page on Itenora.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
 
   const input = trip.generated_plan?.input ?? {};
   const itinerary = Array.isArray(trip.generated_plan?.itinerary)
@@ -258,29 +248,15 @@ if (!trip) {
   const seo = trip.generated_plan?.seo ?? {};
 
   const destination = cleanText(trip.destination || input.destination || "");
-const days = getTripDays(input, itinerary);
+  const h1 =
+    cleanText(seo.h1) ||
+    cleanText(trip.title) ||
+    buildFallbackTitle(destination, input, itinerary);
 
-const fallbackTitle = buildFallbackTitle(destination, input, itinerary);
-const fallbackDescription = buildFallbackDescription(destination, input, itinerary);
-
-const rawH1 = cleanText(seo.h1);
-const rawSeoTitle = cleanText(seo.seoTitle);
-const rawSeoDescription = cleanText(seo.seoDescription);
-
-const h1 =
-  rawH1 && !containsWrongDayLabel(rawH1, days)
-    ? rawH1
-    : cleanText(trip.title) || fallbackTitle;
-
-const seoTitle =
-  rawSeoTitle && !containsWrongDayLabel(rawSeoTitle, days)
-    ? rawSeoTitle
-    : cleanText(trip.title) || h1;
-
-const seoDescription =
-  rawSeoDescription && !containsWrongDayLabel(rawSeoDescription, days)
-    ? rawSeoDescription
-    : fallbackDescription;
+  const seoTitle = cleanText(seo.seoTitle) || cleanText(trip.title) || h1;
+  const seoDescription =
+    cleanText(seo.seoDescription) ||
+    buildFallbackDescription(destination, input);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
   const canonicalUrl = `${siteUrl}/trips/share/${params.slug}`;
@@ -305,6 +281,10 @@ const seoDescription =
       card: "summary_large_image",
       title: pageTitle,
       description: seoDescription,
+    },
+    robots: {
+      index: isIndexableTrip(params.slug),
+      follow: isIndexableTrip(params.slug),
     },
   };
 }
@@ -345,69 +325,24 @@ export default async function PublicTripPage({ params }: PageProps) {
 
   const destination = cleanText(trip.destination || input.destination || "");
   const tripCountry = getCountryFromDestination(destination);
-const days = getTripDays(input, itinerary);
 
- const rawTitle = cleanText(seo.h1);
+  const title =
+    cleanText(seo.h1) ||
+    cleanText(trip.title) ||
+    buildFallbackTitle(destination, input, itinerary);
 
-const title =
-  rawTitle && !containsWrongDayLabel(rawTitle, days)
-    ? rawTitle
-    : cleanText(trip.title) || buildFallbackTitle(destination, input, itinerary);
+  const introParagraph =
+    cleanText(seo.introParagraph) ||
+    `This itinerary for ${destination || "your destination"} includes day-by-day suggestions, attractions, food stops, and practical planning ideas to make the trip easier.`;
 
-const audienceLabel =
-  cleanText(input?.people) === "family"
-    ? "family"
-    : cleanText(input?.people) === "couple"
-      ? "couple"
-      : cleanText(input?.people) === "solo"
-        ? "solo"
-        : "travel";
+  const overviewBullets = cleanStringArray(seo.overviewBullets);
 
-const normalizedDestination = destination.toLowerCase();
-
-const isBaliPage = normalizedDestination.includes("bali");
-
-const isJapanPage =
-  normalizedDestination.includes("japan") ||
-  normalizedDestination.includes("tokyo") ||
-  normalizedDestination.includes("osaka") ||
-  normalizedDestination.includes("kyoto");
-
-const introParagraph = isBaliPage
-  ? "Planning a 5-day Bali itinerary for solo travel on a budget? This guide covers the best places to visit in Bali including Uluwatu, Ubud, rice terraces, temples, and hidden gems — all organised into a simple, stress-free 5-day plan."
- : isJapanPage
-  ? `Planning a ${days || 5}-day ${destination} itinerary for families? This Japan travel guide covers top attractions like Osaka Castle, Dotonbori, Universal Studios Japan, temples, markets, and family-friendly day-by-day stops to make planning much easier.`
-    : days
-      ? `Planning a ${days}-day ${destination || "trip"} itinerary? This guide features a practical mix of attractions, memorable stops, and day-by-day travel ideas to make your trip easier.`
-      : `Planning a trip to ${destination || "your destination"}? This itinerary gives you practical day-by-day ideas to make travel planning easier.`;
- const seoOverviewBullets = cleanStringArray(seo.overviewBullets);
-
-const generatedOverviewBullets = itinerary.map((day: any, index: number) => {
-  const stops = Array.isArray(day?.stops) ? day.stops : [];
-
-  const stopTitles = stops
-    .slice(0, 2)
-    .map((stop: any) => cleanText(stop?.title))
-    .filter(Boolean);
-
-  if (stopTitles.length > 0) {
-    return `Day ${day?.day ?? index + 1}: ${stopTitles.join(" and ")}.`;
-  }
-
-  const theme = cleanText(day?.theme);
-  if (theme) {
-    return `Day ${day?.day ?? index + 1}: Enjoy ${theme.toLowerCase()}.`;
-  }
-
-  return `Day ${day?.day ?? index + 1}: Explore ${destination}.`;
-});
-
-const overviewBullets =
-  seoOverviewBullets.length === itinerary.length && itinerary.length > 0
-    ? seoOverviewBullets
-    : generatedOverviewBullets;
-
-  
+  const days =
+    typeof input.days === "number"
+      ? input.days
+      : itinerary.length > 0
+        ? itinerary.length
+        : null;
 
   const people = cleanText(input.people);
   const adults = people === "solo" ? 1 : people === "couple" ? 2 : 2;
@@ -443,13 +378,21 @@ const overviewBullets =
     adults,
   });
 
-  const { data: relatedTrips } = await supabase
-    .from("itineraries")
-    .select("slug, title, generated_plan")
-    .eq("destination", trip.destination)
-    .neq("slug", params.slug)
-    .not("slug", "is", null)
-    .limit(5);
+  let relatedTrips: any[] = [];
+  const relatedSlugs = getIndexableTripSlugs().filter(
+    (slug) => slug !== params.slug
+  );
+
+  if (isIndexableTrip(params.slug) && relatedSlugs.length > 0) {
+    const { data } = await supabase
+      .from("itineraries")
+      .select("slug, title, generated_plan")
+      .eq("destination", trip.destination)
+      .in("slug", relatedSlugs)
+      .limit(5);
+
+    relatedTrips = data ?? [];
+  }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://itenora.com";
 
@@ -457,11 +400,9 @@ const overviewBullets =
     "@context": "https://schema.org",
     "@type": "TravelItinerary",
     name: title,
- description:
-  cleanText(seo.seoDescription) &&
-  !containsWrongDayLabel(cleanText(seo.seoDescription), days)
-    ? cleanText(seo.seoDescription)
-    : buildFallbackDescription(destination, input, itinerary),
+    description:
+      cleanText(seo.seoDescription) ||
+      `Travel itinerary for ${destination || "your destination"}`,
     url: `${siteUrl}/trips/share/${params.slug}`,
     itinerary: itinerary.map((day: any, index: number) => ({
       "@type": "ListItem",
@@ -496,13 +437,11 @@ const overviewBullets =
             {introParagraph}
           </p>
 
-      <p className="mt-2 text-sm leading-6 text-gray-600">
-  {isBaliPage
-    ? "Perfect for solo travellers, this itinerary helps you save money, avoid tourist traps, and make the most of your time in Bali without overplanning."
-    : isJapanPage
-      ? "Perfect for families visiting Japan for the first time, this itinerary helps you balance sightseeing, food, and kid-friendly attractions without overplanning every detail."
-      : "Updated for 2026 travel. Use this itinerary as a flexible travel guide for what to do, where to go, and how to organise each day more smoothly."}
-</p>
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            Updated for 2026 travel. Use this itinerary as a flexible travel
+            guide for what to do, where to go, and how to organise each day
+            more smoothly.
+          </p>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-600">
             {days ? (
@@ -525,6 +464,13 @@ const overviewBullets =
           </div>
         </header>
 
+        {!isIndexableTrip(params.slug) ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Anyone with this link can view the itinerary. It is not included in
+            Itenora&apos;s search-engine listings.
+          </div>
+        ) : null}
+
         {overviewBullets.length > 0 ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900">
@@ -533,13 +479,13 @@ const overviewBullets =
                 : "Itinerary overview"}
             </h2>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-  {overviewBullets.map((item: string, index: number) => (
-    <li key={index} className="flex gap-2">
-      <span className="mt-1 text-gray-400">•</span>
-      <span>{item}</span>
-    </li>
-  ))}
-</ul>
+              {overviewBullets.map((item, index) => (
+                <li key={index} className="flex gap-2">
+                  <span className="mt-1 text-gray-400">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 
@@ -553,6 +499,8 @@ const overviewBullets =
             Facebook.
           </p>
         </div>
+
+        <KlookDeals destination={destination} />
 
         {destination ? (
           <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
@@ -846,6 +794,8 @@ const overviewBullets =
             </ul>
           </section>
         ) : null}
+
+        <SupportItenora compact />
 
         <footer className="border-t pt-10 text-center">
           <p className="text-gray-600">

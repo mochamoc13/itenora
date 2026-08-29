@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
-
-import ItineraryClient from "@/app/itinerary/ItineraryClient";
+import { redirect } from "next/navigation";
 
 export default function GeneratePage() {
-  return <ItineraryClient />;
+  redirect("/#planner");
 }

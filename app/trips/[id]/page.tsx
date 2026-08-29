@@ -6,6 +6,8 @@ import { redirect, notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ShareTripButton from "@/components/ShareTripButton";
 import DownloadImageButton from "@/components/DownloadImageButton";
+import KlookDeals from "@/components/KlookDeals";
+import SupportItenora from "@/components/SupportItenora";
 import {
   addDays,
   buildHotelAffiliateLink,
@@ -350,6 +352,10 @@ export default async function TripDetailPage({ params }: TripPageProps) {
           </p>
         </div>
 
+        <div className="mb-8">
+          <KlookDeals destination={tripDestination} />
+        </div>
+
         {tripDestination ? (
           <section className="mb-8 rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -614,6 +620,10 @@ export default async function TripDetailPage({ params }: TripPageProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <SupportItenora compact />
       </div>
     </main>
   );

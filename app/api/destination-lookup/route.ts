@@ -10,6 +10,17 @@ type LookupResult = {
   lng?: number;
 };
 
+const BLOCKED_BROAD = new Set([
+  "europe",
+  "asia",
+  "africa",
+  "america",
+  "north america",
+  "south america",
+  "antarctica",
+  "oceania",
+]);
+
 function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -54,6 +65,9 @@ function isAllowedPlace(addresstype?: string, type?: string) {
     "street",
     "house",
     "residential",
+    "hamlet",
+    "neighbourhood",
+    "suburb",
     "postcode",
     "address",
     "bus_stop",
@@ -79,28 +93,25 @@ function scoreResult(item: any, query: string) {
     address.municipality ||
     "";
 
-  const county = address.county || "";
-  const state = address.state || address.region || "";
   const country = address.country || "";
+  const state = address.state || address.region || "";
   const display = item.display_name || "";
 
-  const haystacks = [city, county, state, country, display].map(normalizeText);
+  const haystacks = [city, country, state, display].map(normalizeText);
 
   let score = 0;
 
   for (const h of haystacks) {
     if (!h) continue;
-
-    if (h === q) score += 200;
-    else if (h.startsWith(q)) score += 120;
+    if (h === q) score += 120;
+    else if (h.startsWith(q)) score += 80;
     else if (h.includes(q)) score += 40;
   }
 
   const kind = classifyType(item.addresstype, item.type);
-
   if (kind === "city") score += 40;
-  if (kind === "region") score += 20;
-  if (kind === "country") score += 15;
+  if (kind === "country") score += 30;
+  if (kind === "region") score += 10;
 
   if (!isAllowedPlace(item.addresstype, item.type)) score -= 200;
 
@@ -109,12 +120,10 @@ function scoreResult(item: any, query: string) {
 
 function dedupeResults(results: LookupResult[]) {
   const seen = new Set<string>();
-
   return results.filter((r) => {
     const key = normalizeText(
-      `${r.label}|${r.city || ""}|${r.state || ""}|${r.country || ""}|${r.type}`
+      `${r.label}|${r.city || ""}|${r.country || ""}|${r.type}`
     );
-
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -129,96 +138,78 @@ export async function GET(req: Request) {
     return NextResponse.json({ results: [] });
   }
 
+  const normalizedQ = normalizeText(q);
+
+  if (BLOCKED_BROAD.has(normalizedQ)) {
+    return NextResponse.json({
+      results: [],
+      message: "Please choose a specific city or country.",
+    });
+  }
+
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("q", q);
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("addressdetails", "1");
-  url.searchParams.set("limit", "8");
+  url.searchParams.set("limit", "12");
 
-  try {
-    const res = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "itenora/1.0",
-        "Accept-Language": "en",
-      },
-      cache: "no-store",
-    });
+  const res = await fetch(url.toString(), {
+    headers: {
+      "User-Agent": "itenora/1.0",
+      "Accept-Language": "en",
+    },
+    cache: "no-store",
+  });
 
-    if (!res.ok) {
-      return NextResponse.json({ results: [] });
-    }
-
-    const raw = await res.json();
-    const list = Array.isArray(raw) ? raw : [];
-
-    const mapped = list
-      .filter((item) => {
-        if (!isAllowedPlace(item.addresstype, item.type)) return false;
-
-        const t = classifyType(item.addresstype, item.type);
-        return t === "city" || t === "country" || t === "region" || t === "place";
-      })
-      .map((item) => {
-        const address = item.address || {};
-
-        const city =
-          address.city ||
-          address.town ||
-          address.village ||
-          address.municipality ||
-          address.hamlet ||
-          undefined;
-
-        const state =
-          address.state ||
-          address.region ||
-          address.county ||
-          undefined;
-
-        const country = address.country || undefined;
-        const type = classifyType(item.addresstype, item.type);
-
-        const cleanCity = city?.trim();
-        const cleanState = state?.trim();
-        const cleanCountry = country?.trim();
-
-        let label = item.display_name;
-
-        if (cleanCity && cleanState && cleanCountry) {
-          label = `${cleanCity}, ${cleanState}, ${cleanCountry}`;
-        } else if (cleanCity && cleanCountry) {
-          label = `${cleanCity}, ${cleanCountry}`;
-        } else if (cleanState && cleanCountry) {
-          label = `${cleanState}, ${cleanCountry}`;
-        } else if (cleanCountry) {
-          label = cleanCountry;
-        } else if (cleanCity) {
-          label = cleanCity;
-        }
-
-        const result: LookupResult = {
-          label,
-          city: cleanCity,
-          state: cleanState,
-          country: cleanCountry,
-          type,
-          lat: item.lat ? Number(item.lat) : undefined,
-          lng: item.lon ? Number(item.lon) : undefined,
-        };
-
-        return {
-          result,
-          score: scoreResult(item, q),
-        };
-      })
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map((x) => x.result);
-
-    const deduped = dedupeResults(mapped).slice(0, 6);
-
-    return NextResponse.json({ results: deduped });
-  } catch {
+  if (!res.ok) {
     return NextResponse.json({ results: [] });
   }
+
+  const raw = await res.json();
+  const list = Array.isArray(raw) ? raw : [];
+
+  const mapped = list
+    .filter((item) => isAllowedPlace(item.addresstype, item.type))
+    .map((item) => {
+      const address = item.address || {};
+      const city =
+        address.city ||
+        address.town ||
+        address.village ||
+        address.municipality ||
+        undefined;
+
+      const country = address.country || undefined;
+      const state = address.state || address.region || undefined;
+      const type = classifyType(item.addresstype, item.type);
+
+      const result: LookupResult = {
+        label: item.display_name,
+        city,
+        state,
+        country,
+        type,
+        lat: item.lat ? Number(item.lat) : undefined,
+        lng: item.lon ? Number(item.lon) : undefined,
+      };
+
+      return {
+        result,
+        score: scoreResult(item, q),
+      };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.result);
+
+  const deduped = dedupeResults(mapped).slice(0, 6);
+
+  if (deduped.length === 0) {
+    return NextResponse.json({
+      results: [],
+      message: "Please choose a specific city or country.",
+    });
+  }
+
+  return NextResponse.json({ results: deduped });
 }

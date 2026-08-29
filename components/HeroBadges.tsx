@@ -5,7 +5,7 @@ export default function HeroBadges() {
         <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">
           ✓
         </span>
-        Start free
+        Free to use
       </span>
 
       <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm">
@@ -14,8 +14,8 @@ export default function HeroBadges() {
       </span>
 
       <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm">
-        <span>🔒</span>
-        Cancel anytime
+        <span>✉️</span>
+        Save with email
       </span>
     </div>
   );

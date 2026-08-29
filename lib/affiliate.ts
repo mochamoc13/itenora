@@ -30,7 +30,7 @@ function getTripCity(destination?: string) {
 
 const TRIP_ALLIANCE_ID = "8062244";
 const TRIP_SID = "305024455";
-const KLOOK_AID = "117141";
+const KLOOK_AID = process.env.NEXT_PUBLIC_KLOOK_AID || "117141";
 
 const IGNORED_AREAS = new Set([
   "cbd",
@@ -324,6 +324,15 @@ export function buildKlookActivityLink(title?: string, destination?: string) {
     .join(" ")
     .trim();
 
+  const searchUrl = `https://www.klook.com/en-AU/search/result/?query=${encodeURIComponent(
+    query
+  )}`;
+
+  return buildKlookAffiliateRedirect(searchUrl);
+}
+
+export function buildKlookDestinationLink(destination?: string) {
+  const query = cleanText(destination);
   const searchUrl = `https://www.klook.com/en-AU/search/result/?query=${encodeURIComponent(
     query
   )}`;
